@@ -15,6 +15,22 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
+const posts = collection(db, "posts");
+const comments = collection(db, "comments");
+const users = collection(db, "users");
+const snapshot = await getDocs(posts);
+snapshot.forEach((doc) => {
+  console.log(doc.id, "=>", doc.data());
+});
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    console.log('User is signed in:', user);
+  } else {
+    console.log('No user is signed in.');
+  }
+});
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     const uid = user.uid;
