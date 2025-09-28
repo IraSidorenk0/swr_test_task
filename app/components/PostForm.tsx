@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -36,44 +34,35 @@ export default function PostForm() {
   const [user, loading, error] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
-  
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    setValue,
-    watch
-  } = useForm<PostFormData>({
-    resolver: zodResolver(postSchema) ,
-    defaultValues: {
-      tags: [],
-      likes: 0 
-    }
+  const [formData, setFormData] = useState<PostFormData>({
+    title: '',
+    content: '',
+    tags: [],
+    likes: 0
   });
 
-  const watchedTags = watch('tags');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
 
   const addTag = () => {
-    const currentTags = watchedTags || [];
-    if (currentTags.length < 10) {
-      setValue('tags', [...currentTags, '']);
+    if ((formData.tags?.length || 0) < 10) {
+      setFormData(prev => ({ ...prev, tags: [...(prev.tags || []), ''] }));
     }
   };
 
   const removeTag = (index: number) => {
-    const currentTags = watchedTags || [];
-    setValue('tags', currentTags.filter((_, i) => i !== index));
+    const currentTags = formData.tags || [];
+    setFormData(prev => ({ ...prev, tags: currentTags.filter((_, i) => i !== index) }));
   };
 
   const updateTag = (index: number, value: string) => {
-    const currentTags = watchedTags || [];
+    const currentTags = formData.tags || [];
     const newTags = [...currentTags];
     newTags[index] = value;
-    setValue('tags', newTags);
+    setFormData(prev => ({ ...prev, tags: newTags }));
   };
 
-  const onSubmit = async (data: PostFormData) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (!user) {
       setSubmitMessage('Ошибка: Пользователь не авторизован');
       return;
@@ -81,21 +70,45 @@ export default function PostForm() {
 
     setIsSubmitting(true);
     setSubmitMessage('');
+    setFieldErrors({});
 
     try {
+      const dataToValidate: PostFormData = {
+        title: formData.title,
+        content: formData.content,
+        tags: (formData.tags || []).map(t => (t == null ? '' : t)),
+        likes: Number.isFinite(formData.likes as number) ? Number(formData.likes) : 0
+      };
+
+      const parsed = postSchema.safeParse(dataToValidate);
+      if (!parsed.success) {
+        const flat = parsed.error.flatten();
+        setFieldErrors({
+          title: flat.fieldErrors.title?.[0],
+          content: flat.fieldErrors.content?.[0],
+          tags: flat.fieldErrors.tags?.[0],
+          likes: flat.fieldErrors.likes?.[0]
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const validData = parsed.data;
+
       const postData = {
-        ...data,
+        ...validData,
         authorId: user.uid,
         authorName: user.displayName || user.email || 'Анонимный пользователь',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        tags: data.tags.filter(tag => tag.trim() !== '')
+        tags: validData.tags.filter(tag => tag.trim() !== '')
       };
 
       await addDoc(collection(db, 'posts'), postData);
       
       setSubmitMessage('Пост успешно создан!');
-      reset();
+      setFormData({ title: '', content: '', tags: [], likes: 0 });
+      setFieldErrors({});
     } catch (error) {
       console.error('Ошибка при создании поста:', error);
       setSubmitMessage('Ошибка при создании поста. Попробуйте снова.');
@@ -137,21 +150,22 @@ export default function PostForm() {
         Создать новый пост
       </h1>
       
-      <form onSubmit={handleSubmit(onSubmit as SubmitHandler<PostFormData>)} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-6">
         {/* Заголовок поста */}
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
             Заголовок поста *
           </label>
           <input
-            {...register('title')}
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
             type="text"
             id="title"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Введите заголовок поста..."
           />
-          {errors.title && (
-            <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+          {fieldErrors.title && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.title}</p>
           )}
         </div>
 
@@ -161,14 +175,15 @@ export default function PostForm() {
             Основной текст поста *
           </label>
           <textarea
-            {...register('content')}
+            value={formData.content}
+            onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
             id="content"
             rows={8}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Введите основной текст поста..."
           />
-          {errors.content && (
-            <p className="mt-1 text-sm text-red-600">{errors.content.message}</p>
+          {fieldErrors.content && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.content}</p>
           )}
         </div>
 
@@ -178,7 +193,7 @@ export default function PostForm() {
             Теги * (минимум 1, максимум 10)
           </label>
           <div className="space-y-2">
-            {watchedTags?.map((tag, index) => (
+            {formData.tags?.map((tag, index) => (
               <div key={index} className="flex gap-2">
                 <input
                   type="text"
@@ -196,7 +211,7 @@ export default function PostForm() {
                 </button>
               </div>
             ))}
-            {(!watchedTags || watchedTags.length < 10) && (
+            {(!formData.tags || formData.tags.length < 10) && (
               <button
                 type="button"
                 onClick={addTag}
@@ -206,8 +221,8 @@ export default function PostForm() {
               </button>
             )}
           </div>
-          {errors.tags && (
-            <p className="mt-1 text-sm text-red-600">{errors.tags.message}</p>
+          {fieldErrors.tags && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.tags}</p>
           )}
         </div>
 
@@ -217,15 +232,20 @@ export default function PostForm() {
             Количество лайков (опционально)
           </label>
           <input
-            {...register('likes', { valueAsNumber: true })}
+            value={formData.likes}
+            onChange={(e) => {
+              const value = e.target.value;
+              const num = value === '' ? 0 : Number(value);
+              setFormData(prev => ({ ...prev, likes: Number.isNaN(num) || num < 0 ? 0 : num }));
+            }}
             type="number"
             id="likes"
             min="0"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="0"
           />
-          {errors.likes && (
-            <p className="mt-1 text-sm text-red-600">{errors.likes.message}</p>
+          {fieldErrors.likes && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.likes}</p>
           )}
         </div>
 
@@ -262,7 +282,11 @@ export default function PostForm() {
           </button>
           <button
             type="button"
-            onClick={() => reset()}
+            onClick={() => {
+              setFormData({ title: '', content: '', tags: [], likes: 0 });
+              setFieldErrors({});
+              setSubmitMessage('');
+            }}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             Очистить
