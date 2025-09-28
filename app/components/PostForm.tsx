@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../../firebase/firebase';
+import { create } from 'domain';
 
 // Zod schema for post validation
 const postSchema = z.object({
@@ -30,7 +31,11 @@ const postSchema = z.object({
 
 type PostFormData = z.infer<typeof postSchema>;
 
-export default function PostForm() {
+interface PostFormProps {
+  onSuccess?: () => void;
+}
+
+export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormProps) {
   const [user, loading, error] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
@@ -109,9 +114,30 @@ export default function PostForm() {
       setSubmitMessage('Пост успешно создан!');
       setFormData({ title: '', content: '', tags: [], likes: 0 });
       setFieldErrors({});
-    } catch (error) {
+      
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess();
+        }, 1500); // Small delay to show success message
+      }
+    } catch (error: any) {
       console.error('Ошибка при создании поста:', error);
-      setSubmitMessage('Ошибка при создании поста. Попробуйте снова.');
+      
+      // More specific error messages
+      let errorMessage = 'Ошибка при создании поста. Попробуйте снова.';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Ошибка доступа. Проверьте настройки Firebase Security Rules.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Firebase недоступен. Проверьте подключение к интернету.';
+      } else if (error.code === 'unauthenticated') {
+        errorMessage = 'Ошибка аутентификации. Пожалуйста, войдите в систему снова.';
+      } else if (error.message) {
+        errorMessage = `Ошибка: ${error.message}`;
+      }
+      
+      setSubmitMessage(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -142,13 +168,19 @@ export default function PostForm() {
         </div>
       </div>
     );
+  } 
+
+   const createPost = () => {
+    // Logic to open the PostForm modal or navigate to the PostForm page
+    // setShowPostForm(true);
   }
+  
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+      <button className="text-3xl font-bold mb-6 text-center text-gray-800" onClick={createPost}>
         Создать новый пост
-      </h1>
+      </button>        
       
       <form onSubmit={onSubmit} className="space-y-6">
         {/* Заголовок поста */}

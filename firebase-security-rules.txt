@@ -1,0 +1,54 @@
+# Firebase Firestore Security Rules
+# Copy and paste these rules into your Firebase Console > Firestore Database > Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Posts collection rules
+    match /posts/{postId} {
+      // Allow read access to all posts (public)
+      allow read: if true;
+      
+      // Allow write access only to authenticated users
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.authorId;
+      
+      // Allow update/delete only by the post author
+      allow update, delete: if request.auth != null 
+        && request.auth.uid == resource.data.authorId;
+    }
+    
+    // Comments collection rules (if you plan to add comments)
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.authorId;
+      allow update, delete: if request.auth != null 
+        && request.auth.uid == resource.data.authorId;
+    }
+    
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+# Alternative more permissive rules for testing (NOT RECOMMENDED FOR PRODUCTION):
+# 
+# rules_version = '2';
+# service cloud.firestore {
+#   match /databases/{database}/documents {
+#     match /{document=**} {
+#       allow read, write: if true;
+#     }
+#   }
+# }
+
+# How to apply these rules:
+# 1. Go to Firebase Console (https://console.firebase.google.com)
+# 2. Select your project: my-project-1516289182804
+# 3. Go to Firestore Database > Rules tab
+# 4. Replace the existing rules with the rules above
+# 5. Click "Publish" to apply the changes
+
