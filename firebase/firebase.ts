@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCYWOCECo-jpjhoxatvOKs1-aTKdUQtqKk",
@@ -16,3 +16,22 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
+
+// Add connection monitoring
+let isOnline = true;
+
+// Monitor online/offline status
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    isOnline = true;
+    enableNetwork(db).catch(console.error);
+  });
+
+  window.addEventListener('offline', () => {
+    isOnline = false;
+    disableNetwork(db).catch(console.error);
+  });
+}
+
+// Export connection status
+export const getConnectionStatus = () => isOnline;

@@ -70,20 +70,25 @@ export default function PostList() {
       setLoading(true);
       setError(null);
       
+      console.log('🔄 Fetching posts from Firestore...');
       const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(postsQuery);
       
+      console.log(`📊 Found ${querySnapshot.size} posts in Firestore`);
+      
       const fetchedPosts: Post[] = [];
       querySnapshot.forEach((doc) => {
+        console.log('📝 Processing post:', doc.id, doc.data());
         fetchedPosts.push({
           id: doc.id,
           ...doc.data()
         } as Post);
       });
       
+      console.log(`✅ Successfully loaded ${fetchedPosts.length} posts`);
       setPosts(fetchedPosts);
     } catch (error: any) {
-      console.error('Error fetching posts:', error);
+      console.error('❌ Error fetching posts:', error);
       setError(error);
     } finally {
       setLoading(false);
@@ -111,6 +116,7 @@ export default function PostList() {
 
   // Handle post creation success
   const handlePostCreated = () => {
+    console.log('🎉 Post creation successful! Refreshing posts list...');
     setShowPostForm(false);
     // Refresh posts after creating a new one
     fetchPosts();
@@ -371,7 +377,7 @@ export default function PostList() {
       {/* Post Form */}
       {showPostForm && (
         <div className="mb-8">
-          <PostForm onSuccess={() => setShowPostForm(false)} />
+          <PostForm onSuccess={handlePostCreated} />
         </div>
       )}
 
