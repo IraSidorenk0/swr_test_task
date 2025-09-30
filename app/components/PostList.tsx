@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged } from 'firebase/auth';
 import { z } from 'zod';
 import { db, auth } from '../../firebase/firebase';
-import { Post, LoginFormData, RegistrationFormData } from '../types';
+import { Post, LoginFormData, RegistrationFormData, PostFormData } from '../types';
 import PostForm from './PostForm';
 
 // Zod schemas for validation
@@ -42,6 +42,10 @@ export default function PostList() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<PostFormData>({ title: '', content: '', tags: [], likes: 0 });
+  const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
+  const [isEditing, setIsEditing] = useState(false);
   
   // Authentication states
   const [user, setUser] = useState<any>(null);
@@ -120,6 +124,78 @@ export default function PostList() {
     setShowPostForm(false);
     // Refresh posts after creating a new one
     fetchPosts();
+  };
+
+  const beginEditPost = (post: Post) => {
+    if (!user) return;
+    if (post.authorId !== user.uid) return;
+    setEditingPostId(post.id);
+    setEditData({
+      title: post.title,
+      content: post.content,
+      tags: Array.isArray(post.tags) ? post.tags : [],
+      likes: typeof post.likes === 'number' ? post.likes : 0
+    });
+    setEditErrors({});
+  };
+
+  const cancelEditPost = () => {
+    setEditingPostId(null);
+    setEditErrors({});
+    setIsEditing(false);
+  };
+
+  const submitEditPost = async (postId: string) => {
+    if (!user) return;
+    setIsEditing(true);
+    setEditErrors({});
+    try {
+      const cleanedTags = (editData.tags || []).map(t => (t ?? '').trim()).filter(t => t.length > 0);
+      if (!editData.title || editData.title.trim().length < 5) {
+        setEditErrors(prev => ({ ...prev, title: 'Минимум 5 символов' }));
+        setIsEditing(false);
+        return;
+      }
+      if (!editData.content || editData.content.trim().length < 10) {
+        setEditErrors(prev => ({ ...prev, content: 'Минимум 10 символов' }));
+        setIsEditing(false);
+        return;
+      }
+      if (cleanedTags.length === 0) {
+        setEditErrors(prev => ({ ...prev, tags: 'Добавьте хотя бы один тег' }));
+        setIsEditing(false);
+        return;
+      }
+
+      await updateDoc(doc(db, 'posts', postId), {
+        title: editData.title.trim(),
+        content: editData.content.trim(),
+        tags: cleanedTags,
+        likes: Math.max(0, Number(editData.likes || 0)),
+        updatedAt: serverTimestamp()
+      });
+
+      setEditingPostId(null);
+      await fetchPosts();
+    } catch (e) {
+      console.error('Error updating post:', e);
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleDeletePost = async (post: Post) => {
+    if (!user) return;
+    if (post.authorId !== user.uid) return;
+    const confirmed = window.confirm('Удалить этот пост? Это действие необратимо.');
+    if (!confirmed) return;
+    try {
+      await deleteDoc(doc(db, 'posts', post.id));
+      if (editingPostId === post.id) cancelEditPost();
+      await fetchPosts();
+    } catch (e) {
+      console.error('Error deleting post:', e);
+    }
   };
 
   const formatDate = (timestamp: any) => {
@@ -613,14 +689,104 @@ export default function PostList() {
                     <span>❤️ {post.likes}</span>
                   </div>
                 </div>
+                {user && user.uid === post.authorId && (
+                  <div className="flex gap-2">
+                    {editingPostId === post.id ? (
+                      <>
+                        <button
+                          onClick={() => submitEditPost(post.id)}
+                          disabled={isEditing}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        >
+                          Сохранить
+                        </button>
+                        <button
+                          onClick={cancelEditPost}
+                          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+                        >
+                          Отмена
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => beginEditPost(post)}
+                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600"
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          onClick={() => handleDeletePost(post)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                        >
+                          Удалить
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Post Content */}
-              <div className="prose max-w-none mb-4">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {post.content}
-                </p>
-              </div>
+              {/* Post Content or Edit Form */}
+              {editingPostId === post.id ? (
+                <div className="space-y-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Заголовок *</label>
+                    <input
+                      value={editData.title}
+                      onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Введите заголовок"
+                    />
+                    {editErrors.title && (<p className="mt-1 text-sm text-red-600">{editErrors.title}</p>)}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Текст *</label>
+                    <textarea
+                      value={editData.content}
+                      onChange={(e) => setEditData(prev => ({ ...prev, content: e.target.value }))}
+                      rows={6}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Введите текст поста"
+                    />
+                    {editErrors.content && (<p className="mt-1 text-sm text-red-600">{editErrors.content}</p>)}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Теги (через запятую) *</label>
+                    <input
+                      value={(editData.tags || []).join(', ')}
+                      onChange={(e) => {
+                        const tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
+                        setEditData(prev => ({ ...prev, tags }));
+                      }}
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="tag1, tag2"
+                    />
+                    {editErrors.tags && (<p className="mt-1 text-sm text-red-600">{editErrors.tags}</p>)}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Лайки</label>
+                    <input
+                      value={editData.likes}
+                      onChange={(e) => {
+                        const num = Number(e.target.value);
+                        setEditData(prev => ({ ...prev, likes: Number.isFinite(num) && num >= 0 ? num : 0 }));
+                      }}
+                      type="number"
+                      min="0"
+                      className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="prose max-w-none mb-4">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+              )}
 
               {/* Tags */}
               {post.tags && post.tags.length > 0 && (
