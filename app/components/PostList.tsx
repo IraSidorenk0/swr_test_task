@@ -863,10 +863,11 @@ export default function PostList() {
                   </div>
                 </div>
               ) : (
-                <div className="prose max-w-none mb-4">
+                <div className="prose max-w-none mb-4 max-h-[150px] overflow-hidden relative">
                   <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {post.content}
                   </p>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white"></div>
                 </div>
               )}
 
