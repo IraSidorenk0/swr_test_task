@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, increment, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, increment, getDoc, setDoc, where } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged } from 'firebase/auth';
 import { z } from 'zod';
 import { db, auth } from '../../firebase/firebase';
@@ -47,6 +47,11 @@ export default function PostList() {
   const [editData, setEditData] = useState<PostFormData>({ title: '', content: '', tags: [], likes: 0 });
   const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
   const [isEditing, setIsEditing] = useState(false);
+  // Filters
+  const [authorFilter, setAuthorFilter] = useState<string>('');
+  const [tagFilter, setTagFilter] = useState<string>('');
+  const [appliedAuthorFilter, setAppliedAuthorFilter] = useState<string>('');
+  const [appliedTagFilter, setAppliedTagFilter] = useState<string>('');
   
   // Authentication states
   const [user, setUser] = useState<any>(null);
@@ -77,22 +82,93 @@ export default function PostList() {
       setError(null);
       
       console.log('🔄 Fetching posts from Firestore...');
-      const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(postsQuery);
+      const baseConstraints: any[] = [];
+      if (appliedAuthorFilter.trim()) {
+        baseConstraints.push(where('authorName', '==', appliedAuthorFilter.trim()));
+      }
+      if (appliedTagFilter.trim()) {
+        baseConstraints.push(where('tags', 'array-contains', appliedTagFilter.trim()));
+      }
+
+      let querySnapshot;
+      try {
+        const withOrder = query(collection(db, 'posts'), ...baseConstraints, orderBy('createdAt', 'desc'));
+        querySnapshot = await getDocs(withOrder);
+      } catch (e: any) {
+        // If an index is required, retry without orderBy and sort client-side
+        const message = (e && e.message) || '';
+        if (message.includes('index') || message.includes('FAILED_PRECONDITION')) {
+          console.warn('⚠️ Missing index, retrying without orderBy and sorting client-side');
+          const withoutOrder = query(collection(db, 'posts'), ...baseConstraints);
+          querySnapshot = await getDocs(withoutOrder);
+        } else {
+          throw e;
+        }
+      }
       
       console.log(`📊 Found ${querySnapshot.size} posts in Firestore`);
       
       const fetchedPosts: Post[] = [];
-      querySnapshot.forEach((doc) => {
-        console.log('📝 Processing post:', doc.id, doc.data());
+      querySnapshot.forEach((snapshotDoc) => {
+        console.log('📝 Processing post:', snapshotDoc.id, snapshotDoc.data());
+        const data = snapshotDoc.data() as any;
         fetchedPosts.push({
-          id: doc.id,
-          ...doc.data()
+          id: snapshotDoc.id,
+          title: data?.title,
+          content: data?.content,
+          tags: Array.isArray(data?.tags) ? data.tags : [],
+          likes: typeof data?.likes === 'number' ? data.likes : 0,
+          authorId: data?.authorId,
+          authorName: data?.authorName,
+          createdAt: data?.createdAt,
+          updatedAt: data?.updatedAt,
         } as Post);
       });
       
-      console.log(`✅ Successfully loaded ${fetchedPosts.length} posts`);
-      setPosts(fetchedPosts);
+      let resultPosts = [...fetchedPosts];
+
+      // If exact Firestore match yielded no results, try client-side partial filtering
+      const hasAnyApplied = Boolean(appliedAuthorFilter.trim() || appliedTagFilter.trim());
+      if (hasAnyApplied && resultPosts.length === 0) {
+        try {
+          const allSnapshot = await getDocs(query(collection(db, 'posts')));
+          const allPosts: Post[] = [];
+          allSnapshot.forEach((snapshotDoc) => {
+            const data = snapshotDoc.data() as any;
+            allPosts.push({
+              id: snapshotDoc.id,
+              title: data?.title,
+              content: data?.content,
+              tags: Array.isArray(data?.tags) ? data.tags : [],
+              likes: typeof data?.likes === 'number' ? data.likes : 0,
+              authorId: data?.authorId,
+              authorName: data?.authorName,
+              createdAt: data?.createdAt,
+              updatedAt: data?.updatedAt,
+            } as Post);
+          });
+          const authorTerm = appliedAuthorFilter.trim().toLowerCase();
+          const tagTerm = appliedTagFilter.trim().toLowerCase();
+          resultPosts = allPosts.filter(p => {
+            const matchesAuthor = authorTerm ? (p.authorName || '').toLowerCase().startsWith(authorTerm) : true;
+            const matchesTag = tagTerm ? (p.tags || []).some(t => (t || '').toLowerCase().startsWith(tagTerm)) : true;
+            return matchesAuthor && matchesTag;
+          });
+        } catch (fallbackErr) {
+          console.warn('Partial filter fallback failed:', fallbackErr);
+        }
+      }
+
+      // Sort by createdAt desc client-side
+      const sorted = [...resultPosts].sort((a, b) => {
+        const ta: any = a.createdAt;
+        const tb: any = b.createdAt;
+        const va = ta && typeof ta.toMillis === 'function' ? ta.toMillis() : (ta ? new Date(ta).getTime() : 0);
+        const vb = tb && typeof tb.toMillis === 'function' ? tb.toMillis() : (tb ? new Date(tb).getTime() : 0);
+        return vb - va;
+      });
+      console.log(`✅ Successfully loaded ${sorted.length} posts`);
+      setPosts(sorted);
     } catch (error: any) {
       console.error('❌ Error fetching posts:', error);
       setError(error);
@@ -101,10 +177,10 @@ export default function PostList() {
     }
   };
 
-  // Fetch posts on component mount
+  // Fetch posts on component mount and when applied filters change
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [appliedAuthorFilter, appliedTagFilter]);
 
   // Authentication state listener
   useEffect(() => {
@@ -519,6 +595,57 @@ export default function PostList() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Автор</label>
+            <input
+              type="text"
+              value={authorFilter}
+              onChange={(e) => setAuthorFilter(e.target.value)}
+              placeholder="Имя автора"
+              className="w-full h-8 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Тег</label>
+            <input
+              type="text"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              placeholder="Напр. react"
+              className="w-full h-8 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-end gap-2">
+            <button
+              onClick={() => {
+                setAppliedAuthorFilter(authorFilter.trim());
+                setAppliedTagFilter(tagFilter.trim());
+              }}
+              className="px-4 py-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Применить
+            </button>
+            <button
+              onClick={() => { 
+                setAuthorFilter(''); 
+                setTagFilter(''); 
+                setAppliedAuthorFilter('');
+                setAppliedTagFilter('');
+              }}
+              className="px-4 py-2 text-xs bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            >
+              Сбросить
+            </button>
+          </div>
+        </div>
+        {(authorFilter || tagFilter) && (
+          <div className="mt-2 text-sm text-gray-600">Фильтры активны</div>
+        )}
+      </div>
+
       {/* Post Form */}
       {showPostForm && (
         <div className="mb-8">
@@ -757,7 +884,13 @@ export default function PostList() {
                     </Link>
                   </h2>
                   <div className="flex items-center text-sm text-gray-500 space-x-4">
-                    <span>👤 {post.authorName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setAuthorFilter(post.authorName || ''); setAppliedAuthorFilter(post.authorName || ''); }}
+                      className="text-left hover:underline"
+                    >
+                      👤 {post.authorName}
+                    </button>
                     <span>📅 {formatDate(post.createdAt)}</span>
                     <span>❤️ {post.likes}</span>
                   </div>
@@ -875,12 +1008,14 @@ export default function PostList() {
               {post.tags && post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((tag, index) => (
-                    <span
+                    <button
+                      type="button"
                       key={index}
-                      className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                      onClick={() => { setTagFilter(tag); setAppliedTagFilter(tag); }}
+                      className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full hover:bg-blue-200"
                     >
                       #{tag}
-                    </span>
+                    </button>
                   ))}
                 </div>
               )}

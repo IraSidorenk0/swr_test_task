@@ -142,12 +142,6 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         tags: cleanedTags
       };
       
-      console.log('📅 Timestamp info:', {
-        serverTimestamp: typeof serverTimestamp(),
-        fallbackTimestamp: timestamp,
-        timestampObject: postData.createdAt
-      });
-      
       // Add a small delay to ensure auth token is fresh
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -165,11 +159,6 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       
       console.log('🔄 Attempting to create Firestore collection reference...');
       const postsCollection = collection(db, 'posts');
-      console.log('✅ Collection reference created:', postsCollection);
-      
-      console.log('🔄 Attempting to add document to Firestore...');
-      console.log('   Collection path:', postsCollection.path);
-      console.log('   Document data keys:', Object.keys(postData));
       
       // Add timeout to detect hanging operations
       const timeoutPromise = new Promise((_, reject) => {
@@ -177,8 +166,6 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       });
       
       const addDocPromise = addDoc(postsCollection, postData);
-      
-      console.log('⏱️  Waiting for Firestore response...');
       
       let docRef;
       try {
@@ -363,7 +350,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
               <button
                 type="button"
                 onClick={addTag}
-                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="px-4 py-2 bg-green-500 text-sm text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 Добавить тег
               </button>
