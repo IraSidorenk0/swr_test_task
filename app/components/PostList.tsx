@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { db, auth } from '../../firebase/firebase';
 import { Post, LoginFormData, RegistrationFormData, PostFormData } from '../types';
 import PostForm from './PostForm';
+import Link from 'next/link';
 
 // Zod schemas for validation
 const loginSchema = z.object({
@@ -682,7 +683,11 @@ export default function PostList() {
               {/* Post Header */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">{post.title}</h2>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    <Link href={`/posts/${post.id}`} className="hover:underline">
+                      {post.title}
+                    </Link>
+                  </h2>
                   <div className="flex items-center text-sm text-gray-500 space-x-4">
                     <span>👤 {post.authorName}</span>
                     <span>📅 {formatDate(post.createdAt)}</span>
@@ -801,6 +806,16 @@ export default function PostList() {
                   ))}
                 </div>
               )}
+
+              {/* Open Post */}
+              <div className="mt-4">
+                <Link
+                  href={`/posts/${post.id}`}
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Открыть пост
+                </Link>
+              </div>
             </div>
           ))
         )}
