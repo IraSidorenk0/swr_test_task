@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, increment, getDoc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged } from 'firebase/auth';
 import { z } from 'zod';
 import { db, auth } from '../../firebase/firebase';
@@ -55,6 +55,7 @@ export default function PostList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   
   // Form data states
   const [loginData, setLoginData] = useState<LoginFormData>({
@@ -113,6 +114,8 @@ export default function PostList() {
         setShowLoginForm(false);
         setShowRegisterForm(false);
         setSubmitMessage('');
+        // Refresh liked states when user logs in
+        fetchLikedStates();
       }
     });
 
@@ -125,6 +128,28 @@ export default function PostList() {
     setShowPostForm(false);
     // Refresh posts after creating a new one
     fetchPosts();
+  };
+
+  const fetchLikedStates = async () => {
+    try {
+      const current = auth.currentUser;
+      if (!current) {
+        setLikedPostIds(new Set());
+        return;
+      }
+      // For each post, check if like doc exists
+      const results = await Promise.all(posts.map(async (p) => {
+        try {
+          const likeDoc = await getDoc(doc(db, 'posts', p.id, 'likes', current.uid));
+          return likeDoc.exists() ? p.id : null;
+        } catch {
+          return null;
+        }
+      }));
+      setLikedPostIds(new Set(results.filter(Boolean) as string[]));
+    } catch (e) {
+      // Ignore liked state fetch errors silently
+    }
   };
 
   const beginEditPost = (post: Post) => {
@@ -196,6 +221,49 @@ export default function PostList() {
       await fetchPosts();
     } catch (e) {
       console.error('Error deleting post:', e);
+    }
+  };
+
+  const handleToggleLike = async (post: Post) => {
+    if (!user) {
+      alert('Войдите, чтобы поставить лайк.');
+      return;
+    }
+    const userId = user.uid;
+    const likeDocRef = doc(db, 'posts', post.id, 'likes', userId);
+    const isLiked = likedPostIds.has(post.id);
+    try {
+      if (isLiked) {
+        // Optimistic: decrement and mark unliked
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) - 1) } : p));
+        setLikedPostIds(prev => {
+          const next = new Set(prev);
+          next.delete(post.id);
+          return next;
+        });
+        await deleteDoc(likeDocRef);
+        await updateDoc(doc(db, 'posts', post.id), { likes: increment(-1) });
+      } else {
+        // Optimistic: increment and mark liked
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) + 1) } : p));
+        setLikedPostIds(prev => new Set(prev).add(post.id));
+        await setDoc(likeDocRef, { userId, createdAt: serverTimestamp() });
+        await updateDoc(doc(db, 'posts', post.id), { likes: increment(1) });
+      }
+    } catch (e) {
+      console.error('Error toggling like:', e);
+      // Revert UI on failure
+      if (isLiked) {
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) + 1) } : p));
+        setLikedPostIds(prev => new Set(prev).add(post.id));
+      } else {
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 1) - 1) } : p));
+        setLikedPostIds(prev => {
+          const next = new Set(prev);
+          next.delete(post.id);
+          return next;
+        });
+      }
     }
   };
 
@@ -421,13 +489,13 @@ export default function PostList() {
               </span>
               <button
                 onClick={() => setShowPostForm(!showPostForm)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="bg-blue-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
                 {showPostForm ? 'Скрыть форму' : 'Создать новый пост'}
               </button>
               <button
                 onClick={handleLogout}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                className="bg-red-600 text-white text-sm px-6 py-2 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
               >
                 Выйти
               </button>
@@ -436,13 +504,13 @@ export default function PostList() {
             <>
               <button
                 onClick={loginToSite}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="bg-blue-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
                 Войти
               </button>
               <button
                 onClick={registerToSite}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                className="bg-green-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
               >
                 Регистрация
               </button>
@@ -701,13 +769,13 @@ export default function PostList() {
                         <button
                           onClick={() => submitEditPost(post.id)}
                           disabled={isEditing}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          className="bg-green-600  text-xs text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
                         >
                           Сохранить
                         </button>
                         <button
                           onClick={cancelEditPost}
-                          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+                          className="bg-gray-500 text-xs text-white px-4 py-2 rounded-lg hover:bg-gray-600"
                         >
                           Отмена
                         </button>
@@ -716,13 +784,13 @@ export default function PostList() {
                       <>
                         <button
                           onClick={() => beginEditPost(post)}
-                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600"
+                          className="bg-yellow-500 text-xs text-white px-4 py-2 rounded-lg hover:bg-yellow-600"
                         >
                           Редактировать
                         </button>
                         <button
                           onClick={() => handleDeletePost(post)}
-                          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                          className="bg-red-600 text-xs text-white px-4 py-2 rounded-lg hover:bg-red-700"
                         >
                           Удалить
                         </button>
@@ -730,6 +798,15 @@ export default function PostList() {
                     )}
                   </div>
                 )}
+                {/* Like Button */}
+                <div className="ml-4">
+                  <button
+                    onClick={() => handleToggleLike(post)}
+                    className={`text-xs px-3 py-1 rounded-full ${likedPostIds.has(post.id) ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
+                  >
+                    {likedPostIds.has(post.id) ? '💗 Лайкнуто' : '❤️ Лайк'}
+                  </button>
+                </div>
               </div>
 
               {/* Post Content or Edit Form */}
@@ -811,7 +888,7 @@ export default function PostList() {
               <div className="mt-4">
                 <Link
                   href={`/posts/${post.id}`}
-                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  className="inline-block text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                 >
                   Открыть пост
                 </Link>

@@ -21,11 +21,7 @@ const postSchema = z.object({
     .max(10, 'Максимум 10 тегов')
     .refine(tags => tags.every(tag => tag.trim().length > 0), {
       message: 'Теги не могут быть пустыми'
-    }),
-  likes: z.number()
-    .int('Количество лайков должно быть целым числом')
-    .min(0, 'Количество лайков не может быть отрицательным')
-    .default(0) 
+    })
 });
 
 type PostFormData = z.infer<typeof postSchema>;
@@ -42,8 +38,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
   const [formData, setFormData] = useState<PostFormData>({
     title: '',
     content: '',
-    tags: [],
-    likes: 0
+    tags: []
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
@@ -108,8 +103,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       const dataToValidate: PostFormData = {
         title: formData.title,
         content: formData.content,
-        tags: (formData.tags || []).map(t => (t == null ? '' : t)),
-        likes: Number.isFinite(formData.likes as number) ? Number(formData.likes) : 0
+        tags: (formData.tags || []).map(t => (t == null ? '' : t))
       };
 
       const parsed = postSchema.safeParse(dataToValidate);
@@ -118,8 +112,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         setFieldErrors({
           title: flat.fieldErrors.title?.[0],
           content: flat.fieldErrors.content?.[0],
-          tags: flat.fieldErrors.tags?.[0],
-          likes: flat.fieldErrors.likes?.[0]
+          tags: flat.fieldErrors.tags?.[0]
         });
         setIsSubmitting(false);
         return;
@@ -140,6 +133,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       
       const postData = {
         ...validData,
+        likes: 0,
         authorId: user.uid,
         authorName: user.displayName || user.email || 'Анонимный пользователь',
         createdAt: serverTimestamp(),
@@ -214,7 +208,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       }
       
       setSubmitMessage('Пост успешно создан!');
-      setFormData({ title: '', content: '', tags: [], likes: 0 });
+      setFormData({ title: '', content: '', tags: [] });
       setFieldErrors({});
       
       // Call onSuccess callback if provided
@@ -380,28 +374,6 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
           )}
         </div>
 
-        {/* Количество лайков (опционально) */}
-        <div>
-          <label htmlFor="likes" className="block text-sm font-medium text-gray-700 mb-2">
-            Количество лайков (опционально)
-          </label>
-          <input
-            value={formData.likes}
-            onChange={(e) => {
-              const value = e.target.value;
-              const num = value === '' ? 0 : Number(value);
-              setFormData(prev => ({ ...prev, likes: Number.isNaN(num) || num < 0 ? 0 : num }));
-            }}
-            type="number"
-            id="likes"
-            min="0"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="0"
-          />
-          {fieldErrors.likes && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.likes}</p>
-          )}
-        </div>
 
         {/* Информация о пользователе */}
         <div className="bg-gray-50 p-4 rounded-md">
@@ -426,7 +398,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
           <button
             type="button"
             onClick={() => {
-              setFormData({ title: '', content: '', tags: [], likes: 0 });
+              setFormData({ title: '', content: '', tags: [] });
               setFieldErrors({});
             }}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"

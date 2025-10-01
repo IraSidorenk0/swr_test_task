@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firebase';
+import { doc, getDoc, updateDoc, increment, getDoc as getDocOnce, setDoc, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../../firebase/firebase';
 import { Post } from '../types';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
@@ -15,6 +15,8 @@ export default function PostDetail({ postId }: PostDetailProps) {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [liking, setLiking] = useState(false);
+  const [liked, setLiked] = useState(false);
 
   // Fetch post function
   const fetchPost = async () => {
@@ -40,11 +42,61 @@ export default function PostDetail({ postId }: PostDetailProps) {
     }
   };
 
+  const handleLike = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert('Войдите, чтобы поставить лайк.');
+      return;
+    }
+    if (!post) return;
+    try {
+      setLiking(true);
+      const likeRef = doc(db, 'posts', post.id, 'likes', user.uid);
+      if (liked) {
+        // Unlike
+        setPost(prev => prev ? { ...prev, likes: Math.max(0, (prev.likes || 0) - 1) } as Post : prev);
+        setLiked(false);
+        await deleteDoc(likeRef);
+        await updateDoc(doc(db, 'posts', post.id), { likes: increment(-1) });
+      } else {
+        // Like
+        setPost(prev => prev ? { ...prev, likes: Math.max(0, (prev.likes || 0) + 1) } as Post : prev);
+        setLiked(true);
+        await setDoc(likeRef, { userId: user.uid, createdAt: new Date().toISOString() });
+        await updateDoc(doc(db, 'posts', post.id), { likes: increment(1) });
+      }
+    } catch (e) {
+      console.error('Error liking post:', e);
+      // Revert on failure
+      setPost(prev => prev ? { ...prev, likes: Math.max(0, (prev.likes || 0) + (liked ? 1 : -1)) } as Post : prev);
+      setLiked(prev => !prev);
+    } finally {
+      setLiking(false);
+    }
+  };
+
   // Fetch post on component mount and when postId changes
   useEffect(() => {
     if (postId) {
       fetchPost();
     }
+  }, [postId]);
+
+  // Fetch liked state when post or auth changes
+  useEffect(() => {
+    const sub = auth.onAuthStateChanged(async (current) => {
+      if (postId && current) {
+        try {
+          const likeDoc = await getDocOnce(doc(db, 'posts', postId, 'likes', current.uid));
+          setLiked(likeDoc.exists());
+        } catch {
+          setLiked(false);
+        }
+      } else {
+        setLiked(false);
+      }
+    });
+    return () => sub();
   }, [postId]);
 
   const formatDate = (timestamp: any) => {
@@ -145,6 +197,15 @@ export default function PostDetail({ postId }: PostDetailProps) {
             </div>
             <span>📅 {formatDate(post.createdAt)}</span>
             <span>❤️ {post.likes}</span>
+          </div>
+          <div className="mt-3">
+            <button
+              onClick={handleLike}
+              disabled={liking}
+              className={`text-sm px-4 py-1 rounded-full disabled:opacity-50 ${liked ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
+            >
+              {liked ? '💗 Лайкнуто' : '❤️ Лайк'}
+            </button>
           </div>
         </header>
 
