@@ -14,6 +14,7 @@ import PostCard from './PostCard';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 import EmptyState from './EmptyState';
+import ConfirmDialog from './ConfirmDialog';
 
 
 export default function PostList() {
@@ -25,6 +26,8 @@ export default function PostList() {
   const [editData, setEditData] = useState<PostFormData>({ title: '', content: '', tags: [], likes: 0 });
   const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   // Filters
   const [authorFilter, setAuthorFilter] = useState<string>('');
   const [tagFilter, setTagFilter] = useState<string>('');
@@ -125,17 +128,29 @@ export default function PostList() {
     }
   };
 
-  const handleDeletePost = async (post: Post) => {
+  const handleDeletePost = (post: Post) => {
     if (!user) return;
     if (post.authorId !== user.uid) return;
-    const confirmed = window.confirm('Удалить этот пост? Это действие необратимо.');
-    if (!confirmed) return;
+    setPostToDelete(post);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!postToDelete) return;
     try {
-      await dispatch(deletePost(post.id)).unwrap();
-      if (editingPostId === post.id) cancelEditPost();
+      await dispatch(deletePost(postToDelete.id)).unwrap();
+      if (editingPostId === postToDelete.id) cancelEditPost();
     } catch (e) {
       console.error('Error deleting post:', e);
+    } finally {
+      setConfirmOpen(false);
+      setPostToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmOpen(false);
+    setPostToDelete(null);
   };
 
   const handleToggleLike = async (post: Post) => {
@@ -331,6 +346,16 @@ export default function PostList() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="Удалить этот пост?"
+        description="Это действие необратимо."
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 }
