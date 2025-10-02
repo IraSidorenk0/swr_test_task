@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, increment, getDoc, setDoc, where } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged } from 'firebase/auth';
 import { z } from 'zod';
 import { db, auth } from '../../firebase/firebase';
 import { Post, LoginFormData, RegistrationFormData, PostFormData } from '../types';
 import PostForm from './PostForm';
 import Link from 'next/link';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { fetchPosts, updatePost, deletePost, toggleLike, fetchLikedStates, optimisticToggleLike, revertOptimisticLike } from '../../store/slices/postsSlice';
 
 // Zod schemas for validation
 const loginSchema = z.object({
@@ -39,10 +41,10 @@ const registrationSchema = z.object({
 });
 
 export default function PostList() {
+  const dispatch = useAppDispatch();
+  const { posts, likedPostIds, loading, error } = useAppSelector((state) => state.posts);
+  
   const [showPostForm, setShowPostForm] = useState(false);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editData, setEditData] = useState<PostFormData>({ title: '', content: '', tags: [], likes: 0 });
   const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
@@ -60,7 +62,6 @@ export default function PostList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
-  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   
   // Form data states
   const [loginData, setLoginData] = useState<LoginFormData>({
@@ -75,112 +76,11 @@ export default function PostList() {
     displayName: ''
   });
 
-  // Fetch posts function
-  const fetchPosts = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('🔄 Fetching posts from Firestore...');
-      const baseConstraints: any[] = [];
-      if (appliedAuthorFilter.trim()) {
-        baseConstraints.push(where('authorName', '==', appliedAuthorFilter.trim()));
-      }
-      if (appliedTagFilter.trim()) {
-        baseConstraints.push(where('tags', 'array-contains', appliedTagFilter.trim()));
-      }
-
-      let querySnapshot;
-      try {
-        const withOrder = query(collection(db, 'posts'), ...baseConstraints, orderBy('createdAt', 'desc'));
-        querySnapshot = await getDocs(withOrder);
-      } catch (e: any) {
-        // If an index is required, retry without orderBy and sort client-side
-        const message = (e && e.message) || '';
-        if (message.includes('index') || message.includes('FAILED_PRECONDITION')) {
-          console.warn('⚠️ Missing index, retrying without orderBy and sorting client-side');
-          const withoutOrder = query(collection(db, 'posts'), ...baseConstraints);
-          querySnapshot = await getDocs(withoutOrder);
-        } else {
-          throw e;
-        }
-      }
-      
-      console.log(`📊 Found ${querySnapshot.size} posts in Firestore`);
-      
-      const fetchedPosts: Post[] = [];
-      querySnapshot.forEach((snapshotDoc) => {
-        console.log('📝 Processing post:', snapshotDoc.id, snapshotDoc.data());
-        const data = snapshotDoc.data() as any;
-        fetchedPosts.push({
-          id: snapshotDoc.id,
-          title: data?.title,
-          content: data?.content,
-          tags: Array.isArray(data?.tags) ? data.tags : [],
-          likes: typeof data?.likes === 'number' ? data.likes : 0,
-          authorId: data?.authorId,
-          authorName: data?.authorName,
-          createdAt: data?.createdAt,
-          updatedAt: data?.updatedAt,
-        } as Post);
-      });
-      
-      let resultPosts = [...fetchedPosts];
-
-      // If exact Firestore match yielded no results, try client-side partial filtering
-      const hasAnyApplied = Boolean(appliedAuthorFilter.trim() || appliedTagFilter.trim());
-      if (hasAnyApplied && resultPosts.length === 0) {
-        try {
-          const allSnapshot = await getDocs(query(collection(db, 'posts')));
-          const allPosts: Post[] = [];
-          allSnapshot.forEach((snapshotDoc) => {
-            const data = snapshotDoc.data() as any;
-            allPosts.push({
-              id: snapshotDoc.id,
-              title: data?.title,
-              content: data?.content,
-              tags: Array.isArray(data?.tags) ? data.tags : [],
-              likes: typeof data?.likes === 'number' ? data.likes : 0,
-              authorId: data?.authorId,
-              authorName: data?.authorName,
-              createdAt: data?.createdAt,
-              updatedAt: data?.updatedAt,
-            } as Post);
-          });
-          const authorTerm = appliedAuthorFilter.trim().toLowerCase();
-          const tagTerm = appliedTagFilter.trim().toLowerCase();
-          resultPosts = allPosts.filter(p => {
-            const matchesAuthor = authorTerm ? (p.authorName || '').toLowerCase().startsWith(authorTerm) : true;
-            const matchesTag = tagTerm ? (p.tags || []).some(t => (t || '').toLowerCase().startsWith(tagTerm)) : true;
-            return matchesAuthor && matchesTag;
-          });
-        } catch (fallbackErr) {
-          console.warn('Partial filter fallback failed:', fallbackErr);
-        }
-      }
-
-      // Sort by createdAt desc client-side
-      const sorted = [...resultPosts].sort((a, b) => {
-        const ta: any = a.createdAt;
-        const tb: any = b.createdAt;
-        const va = ta && typeof ta.toMillis === 'function' ? ta.toMillis() : (ta ? new Date(ta).getTime() : 0);
-        const vb = tb && typeof tb.toMillis === 'function' ? tb.toMillis() : (tb ? new Date(tb).getTime() : 0);
-        return vb - va;
-      });
-      console.log(`✅ Successfully loaded ${sorted.length} posts`);
-      setPosts(sorted);
-    } catch (error: any) {
-      console.error('❌ Error fetching posts:', error);
-      setError(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Fetch posts on component mount and when applied filters change
   useEffect(() => {
-    fetchPosts();
-  }, [appliedAuthorFilter, appliedTagFilter]);
+    dispatch(fetchPosts({ authorFilter: appliedAuthorFilter, tagFilter: appliedTagFilter }));
+  }, [dispatch, appliedAuthorFilter, appliedTagFilter]);
 
   // Authentication state listener
   useEffect(() => {
@@ -191,42 +91,22 @@ export default function PostList() {
         setShowRegisterForm(false);
         setSubmitMessage('');
         // Refresh liked states when user logs in
-        fetchLikedStates();
+        if (posts.length > 0) {
+          dispatch(fetchLikedStates({ posts, userId: currentUser.uid }));
+        }
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [dispatch, posts]);
 
   // Handle post creation success
   const handlePostCreated = () => {
     console.log('🎉 Post creation successful! Refreshing posts list...');
     setShowPostForm(false);
-    // Refresh posts after creating a new one
-    fetchPosts();
+    // Posts will be automatically updated via Redux state
   };
 
-  const fetchLikedStates = async () => {
-    try {
-      const current = auth.currentUser;
-      if (!current) {
-        setLikedPostIds(new Set());
-        return;
-      }
-      // For each post, check if like doc exists
-      const results = await Promise.all(posts.map(async (p) => {
-        try {
-          const likeDoc = await getDoc(doc(db, 'posts', p.id, 'likes', current.uid));
-          return likeDoc.exists() ? p.id : null;
-        } catch {
-          return null;
-        }
-      }));
-      setLikedPostIds(new Set(results.filter(Boolean) as string[]));
-    } catch (e) {
-      // Ignore liked state fetch errors silently
-    }
-  };
 
   const beginEditPost = (post: Post) => {
     if (!user) return;
@@ -269,16 +149,15 @@ export default function PostList() {
         return;
       }
 
-      await updateDoc(doc(db, 'posts', postId), {
+      const updates = {
         title: editData.title.trim(),
         content: editData.content.trim(),
         tags: cleanedTags,
         likes: Math.max(0, Number(editData.likes || 0)),
-        updatedAt: serverTimestamp()
-      });
+      };
 
+      await dispatch(updatePost({ postId, updates })).unwrap();
       setEditingPostId(null);
-      await fetchPosts();
     } catch (e) {
       console.error('Error updating post:', e);
     } finally {
@@ -292,9 +171,8 @@ export default function PostList() {
     const confirmed = window.confirm('Удалить этот пост? Это действие необратимо.');
     if (!confirmed) return;
     try {
-      await deleteDoc(doc(db, 'posts', post.id));
+      await dispatch(deletePost(post.id)).unwrap();
       if (editingPostId === post.id) cancelEditPost();
-      await fetchPosts();
     } catch (e) {
       console.error('Error deleting post:', e);
     }
@@ -306,40 +184,18 @@ export default function PostList() {
       return;
     }
     const userId = user.uid;
-    const likeDocRef = doc(db, 'posts', post.id, 'likes', userId);
-    const isLiked = likedPostIds.has(post.id);
+    const isLiked = likedPostIds.includes(post.id);
+    const increment = isLiked ? -1 : 1;
+    
+    // Optimistic update
+    dispatch(optimisticToggleLike({ postId: post.id, increment, isLiked: !isLiked }));
+    
     try {
-      if (isLiked) {
-        // Optimistic: decrement and mark unliked
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) - 1) } : p));
-        setLikedPostIds(prev => {
-          const next = new Set(prev);
-          next.delete(post.id);
-          return next;
-        });
-        await deleteDoc(likeDocRef);
-        await updateDoc(doc(db, 'posts', post.id), { likes: increment(-1) });
-      } else {
-        // Optimistic: increment and mark liked
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) + 1) } : p));
-        setLikedPostIds(prev => new Set(prev).add(post.id));
-        await setDoc(likeDocRef, { userId, createdAt: serverTimestamp() });
-        await updateDoc(doc(db, 'posts', post.id), { likes: increment(1) });
-      }
+      await dispatch(toggleLike({ postId: post.id, userId, isLiked })).unwrap();
     } catch (e) {
       console.error('Error toggling like:', e);
-      // Revert UI on failure
-      if (isLiked) {
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 0) + 1) } : p));
-        setLikedPostIds(prev => new Set(prev).add(post.id));
-      } else {
-        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, (p.likes || 1) - 1) } : p));
-        setLikedPostIds(prev => {
-          const next = new Set(prev);
-          next.delete(post.id);
-          return next;
-        });
-      }
+      // Revert optimistic update on failure
+      dispatch(revertOptimisticLike({ postId: post.id, increment, isLiked: !isLiked }));
     }
   };
 
@@ -383,7 +239,7 @@ export default function PostList() {
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-red-500 text-center max-w-md">
           <h2 className="text-xl font-bold mb-2">Ошибка подключения к Firebase</h2>
-          <p className="mb-4">Не удалось загрузить посты: {error.message}</p>
+          <p className="mb-4">Не удалось загрузить посты: {error}</p>
           <div className="text-sm text-gray-600 bg-gray-100 p-4 rounded-lg">
             <p className="font-semibold mb-2">Возможные причины:</p>
             <ul className="text-left space-y-1">
@@ -403,7 +259,7 @@ export default function PostList() {
               Попробовать снова
             </button>
             <button
-              onClick={fetchPosts}
+              onClick={() => dispatch(fetchPosts({ authorFilter: appliedAuthorFilter, tagFilter: appliedTagFilter }))}
               className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
             >
               Обновить
@@ -935,9 +791,9 @@ export default function PostList() {
                 <div className="ml-4">
                   <button
                     onClick={() => handleToggleLike(post)}
-                    className={`text-xs px-3 py-1 rounded-full ${likedPostIds.has(post.id) ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
+                    className={`text-xs px-3 py-1 rounded-full ${likedPostIds.includes(post.id) ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
                   >
-                    {likedPostIds.has(post.id) ? '💗 Лайкнуто' : '❤️ Лайк'}
+                    {likedPostIds.includes(post.id) ? '💗 Лайкнуто' : '❤️ Лайк'}
                   </button>
                 </div>
               </div>

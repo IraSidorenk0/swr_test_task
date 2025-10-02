@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db, getConnectionStatus } from '../../firebase/firebase';
+import { auth, getConnectionStatus } from '../../firebase/firebase';
+import { useAppDispatch } from '../../store/hooks';
+import * as postsActions from '../../store/slices/postsSlice';
 
 // Zod schema for post validation
 const postSchema = z.object({
@@ -31,6 +32,7 @@ interface PostFormProps {
 }
 
 export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormProps) {
+  const dispatch = useAppDispatch();
   const [user, loading, error] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
@@ -128,71 +130,15 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         return;
       }
 
-      // Try with both serverTimestamp and regular timestamp for debugging
-      const timestamp = new Date().toISOString();
-      
       const postData = {
-        ...validData,
-        likes: 0,
+        title: validData.title,
+        content: validData.content,
+        tags: cleanedTags,
         authorId: user.uid,
         authorName: user.displayName || user.email || 'Анонимный пользователь',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdAtFallback: timestamp, // Backup timestamp
-        tags: cleanedTags
       };
       
-      // Add a small delay to ensure auth token is fresh
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Test Firestore connectivity first
-      console.log('🔄 Testing Firestore connectivity...');
-      try {
-        // Try to read from the posts collection to test connectivity
-        const testDoc = doc(db, 'posts', 'test-connectivity');
-        await getDoc(testDoc);
-        console.log('✅ Firestore connectivity test passed');
-      } catch (connectError) {
-        console.log('⚠️  Firestore connectivity test failed:', connectError);
-        // Continue anyway, as the test document might not exist
-      }
-      
-      console.log('🔄 Attempting to create Firestore collection reference...');
-      const postsCollection = collection(db, 'posts');
-      
-      // Add timeout to detect hanging operations
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Operation timed out after 30 seconds')), 30000);
-      });
-      
-      const addDocPromise = addDoc(postsCollection, postData);
-      
-      let docRef;
-      try {
-        // Try the normal addDoc method first
-        docRef = await Promise.race([addDocPromise, timeoutPromise]);
-      } catch (primaryError) {
-        console.log('⚠️  Primary method failed, trying alternative approach...');
-        console.log('   Primary error:', primaryError);
-        
-        // Alternative approach: Use setDoc with auto-generated ID
-        try {
-          const alternativeDocRef = doc(collection(db, 'posts'));
-          const alternativePostData = {
-            ...postData,
-            createdAt: new Date().toISOString(), // Use regular timestamp instead of serverTimestamp
-            updatedAt: new Date().toISOString()
-          };
-          
-          console.log('🔄 Trying alternative method with setDoc...');
-          await setDoc(alternativeDocRef, alternativePostData);
-          docRef = alternativeDocRef;
-          console.log('✅ Alternative method succeeded!');
-        } catch (alternativeError) {
-          console.error('❌ Alternative method also failed:', alternativeError);
-          throw primaryError; // Throw the original error
-        }
-      }
+      await dispatch(postsActions.createPost(postData));
       
       setSubmitMessage('Пост успешно создан!');
       setFormData({ title: '', content: '', tags: [] });
