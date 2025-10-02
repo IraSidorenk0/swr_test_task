@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, onAuthStateChanged } from 'firebase/auth';
 import { z } from 'zod';
-import { db, auth } from '../../firebase/firebase';
+import { auth } from '../../firebase/firebase';
 import { Post, LoginFormData, RegistrationFormData, PostFormData } from '../types';
 import PostForm from './PostForm';
 import Link from 'next/link';

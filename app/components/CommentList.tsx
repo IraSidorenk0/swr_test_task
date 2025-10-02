@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchComments } from '../../store/slices/commentsSlice';
-import type { Comment } from '../types';
 
 interface CommentListProps {
   postId: string;
