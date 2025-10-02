@@ -1,55 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase/firebase';
-import { Comment } from '../types';
+import { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { fetchComments } from '../../store/slices/commentsSlice';
+import type { Comment } from '../types';
 
 interface CommentListProps {
   postId: string;
 }
 
 export default function CommentList({ postId }: CommentListProps) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const dispatch = useAppDispatch();
+  const { commentsByPost, loading, error } = useAppSelector((state) => state.comments);
+  const comments = commentsByPost[postId] || [];
 
-  // Fetch comments function
-  const fetchComments = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const commentsQuery = query(
-        collection(db, 'comments'),
-        where('postId', '==', postId),
-        orderBy('createdAt', 'asc')
-      );
-      const querySnapshot = await getDocs(commentsQuery);
-      
-      const fetchedComments: Comment[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedComments.push({
-          id: doc.id,
-          ...doc.data()
-        } as Comment);
-      });
-      
-      setComments(fetchedComments);
-    } catch (error: any) {
-      console.error('Error fetching comments:', error);
-      setError(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Fetch comments on component mount and when postId changes
   useEffect(() => {
     if (postId) {
-      fetchComments();
+      dispatch(fetchComments(postId));
     }
-  }, [postId]);
+  }, [dispatch, postId]);
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Дата неизвестна';
@@ -91,9 +62,9 @@ export default function CommentList({ postId }: CommentListProps) {
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="text-red-600 text-center">
           <h3 className="font-semibold mb-2">Ошибка загрузки комментариев</h3>
-          <p className="text-sm mb-3">{error.message}</p>
+          <p className="text-sm mb-3">{error}</p>
           <button
-            onClick={fetchComments}
+            onClick={() => dispatch(fetchComments(postId))}
             className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
           >
             Попробовать снова
@@ -109,12 +80,6 @@ export default function CommentList({ postId }: CommentListProps) {
         <h3 className="text-lg font-semibold text-gray-800">
           Комментарии ({comments.length})
         </h3>
-        <button
-          onClick={fetchComments}
-          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-        >
-          Обновить
-        </button>
       </div>
 
       {comments.length === 0 ? (

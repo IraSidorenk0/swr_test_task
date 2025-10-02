@@ -42,6 +42,6 @@ export interface Comment {
   content: string;
   authorId: string;
   authorName: string;
-  createdAt: any; // Firebase Timestamp
-  updatedAt: any; // Firebase Timestamp
+  createdAt: string; // ISO string timestamp
+  updatedAt: string; // ISO string timestamp
 }

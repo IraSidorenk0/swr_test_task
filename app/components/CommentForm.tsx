@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '../../firebase/firebase';
+import { auth } from '../../firebase/firebase';
+import { useAppDispatch } from '../../store/hooks';
+import * as commentsActions from '../../store/slices/commentsSlice';
 
 // Zod schema for comment validation
 const commentSchema = z.object({
@@ -22,6 +23,7 @@ interface CommentFormProps {
 }
 
 export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
+  const dispatch = useAppDispatch();
   const [user, loading, error] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
@@ -55,15 +57,13 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
       const validData = parsed.data;
 
       const commentData = {
-        ...validData,
+        content: validData.content,
         postId,
         authorId: user.uid,
         authorName: user.displayName || user.email || 'Анонимный пользователь',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'comments'), commentData);
+      await dispatch(commentsActions.createComment(commentData));
       
       setSubmitMessage('Комментарий успешно добавлен!');
       setFormData({ content: '' });
