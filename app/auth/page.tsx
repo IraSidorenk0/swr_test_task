@@ -66,7 +66,7 @@ export default function AuthPage() {
       <div className="max-w-md w-full space-y-8 animate-fade-in">
         <div className="text-center">
           <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-6">
-            SW
+            BB
           </div>
           <h2 className="text-responsive-lg font-bold text-gray-900 mb-2">
             {isLogin ? '👋 Добро пожаловать!' : '🎉 Присоединяйтесь к нам!'}

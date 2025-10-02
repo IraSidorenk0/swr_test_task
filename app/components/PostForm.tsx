@@ -6,6 +6,9 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, getConnectionStatus } from '../../firebase/firebase';
 import { useAppDispatch } from '../../store/hooks';
 import * as postsActions from '../../store/slices/postsSlice';
+import TagManager from './TagManager';
+import UserInfo from './UserInfo';
+import LoadingSpinner from './LoadingSpinner';
 
 // Zod schema for post validation
 const postSchema = z.object({
@@ -57,22 +60,8 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
     return () => clearInterval(interval);
   }, []);
 
-  const addTag = () => {
-    if ((formData.tags?.length || 0) < 10) {
-      setFormData(prev => ({ ...prev, tags: [...(prev.tags || []), ''] }));
-    }
-  };
-
-  const removeTag = (index: number) => {
-    const currentTags = formData.tags || [];
-    setFormData(prev => ({ ...prev, tags: currentTags.filter((_, i) => i !== index) }));
-  };
-
-  const updateTag = (index: number, value: string) => {
-    const currentTags = formData.tags || [];
-    const newTags = [...currentTags];
-    newTags[index] = value;
-    setFormData(prev => ({ ...prev, tags: newTags }));
+  const handleTagsChange = (tags: string[]) => {
+    setFormData(prev => ({ ...prev, tags }));
   };
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -192,11 +181,7 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">Загрузка...</div>
-      </div>
-    );
+    return <LoadingSpinner size="lg" />;
   }
 
   if (error) {
@@ -268,65 +253,15 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         </div>
 
         {/* Теги */}
-        <div>
-          <label className="form-label">
-            🏷️ Теги * (минимум 1, максимум 10)
-          </label>
-          <div className="space-y-2">
-            {formData.tags?.map((tag, index) => (
-              <div key={index} className="flex gap-2">
-                <input
-                  type="text"
-                  value={tag}
-                  onChange={(e) => updateTag(index, e.target.value)}
-                  className="form-input flex-1"
-                  placeholder={`Тег ${index + 1}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeTag(index)}
-                  className="btn btn-danger px-3"
-                  aria-label="Удалить тег"
-                >
-                  🗑️
-                </button>
-              </div>
-            ))}
-            {(!formData.tags || formData.tags.length < 10) && (
-              <button
-                type="button"
-                onClick={addTag}
-                className="btn btn-success text-sm"
-              >
-                ➕ Добавить тег
-              </button>
-            )}
-          </div>
-          {fieldErrors.tags && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.tags}</p>
-          )}
-        </div>
+        <TagManager
+          tags={formData.tags || []}
+          onTagsChange={handleTagsChange}
+          error={fieldErrors.tags}
+        />
 
 
         {/* Информация о пользователе */}
-        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-          <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-            👤 Информация об авторе
-          </h3>
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                {user.displayName || user.email || 'Анонимный пользователь'}
-              </p>
-              <p className="text-xs text-blue-600">
-                ID: {user.uid.slice(0, 8)}...
-              </p>
-            </div>
-          </div>
-        </div>
+        <UserInfo user={user} />
 
         {/* Кнопки */}
         <div className="flex flex-col sm:flex-row gap-3">
