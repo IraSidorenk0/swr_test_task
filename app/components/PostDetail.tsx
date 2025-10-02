@@ -169,75 +169,110 @@ export default function PostDetail({ postId }: PostDetailProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="container-responsive py-8 animate-fade-in">
       {/* Back Button */}
-      <div className="mb-6">
+      <div className="mb-8">
         <button
           onClick={() => window.history.back()}
-          className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+          className="btn btn-outline flex items-center gap-2 hover:gap-3 transition-all"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Назад к списку постов
+          ← Назад к списку
         </button>
       </div>
 
       {/* Post Content */}
-      <article className="bg-white rounded-lg shadow-lg border border-gray-200 p-8 mb-8">
+      <article className="card p-8 mb-12 animate-slide-in">
         {/* Post Header */}
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-4">{post.title}</h1>
-          <div className="flex items-center text-sm text-gray-500 space-x-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2">
-                {post.authorName.charAt(0).toUpperCase()}
+        <header className="mb-8">
+          <h1 className="text-responsive-xl font-bold text-gray-900 mb-6 leading-tight">{post.title}</h1>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold mr-3">
+                  {post.authorName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{post.authorName}</p>
+                  <p className="text-xs text-gray-500">Автор</p>
+                </div>
               </div>
-              <span>{post.authorName}</span>
+              
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
+                <span>{formatDate(post.createdAt)}</span>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                </svg>
+                <span>{post.likes} лайков</span>
+              </div>
             </div>
-            <span>📅 {formatDate(post.createdAt)}</span>
-            <span>❤️ {post.likes}</span>
-          </div>
-          <div className="mt-3">
+            
             <button
               onClick={handleLike}
               disabled={liking}
-              className={`text-sm px-4 py-1 rounded-full disabled:opacity-50 ${liked ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
+              className={`btn text-sm px-6 py-2 rounded-full transition-all disabled:opacity-50 ${liked ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
             >
-              {liked ? '💗 Лайкнуто' : '❤️ Лайк'}
+              {liking ? (
+                <div className="flex items-center gap-2">
+                  <div className="loading-spinner"></div>
+                  Обработка...
+                </div>
+              ) : liked ? '💗 Лайкнуто' : '❤️ Поставить лайк'}
             </button>
           </div>
         </header>
 
         {/* Post Content */}
-        <div className="prose max-w-none mb-6">
-          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
+        <div className="prose prose-lg max-w-none mb-8">
+          <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-responsive-base">
             {post.content}
-          </p>
+          </div>
         </div>
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {post.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full"
-              >
-                #{tag}
-              </span>
-            ))}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              🏷️ Теги
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {post.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 text-sm font-medium px-4 py-2 rounded-full border border-blue-200 hover:shadow-sm transition-shadow"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </article>
 
       {/* Comments Section */}
-      <div className="space-y-6">
-        {/* Comment Form */}
-        <CommentForm postId={postId} onSuccess={handleCommentCreated} />
-        
-        {/* Comment List */}
-        <CommentList postId={postId} />
+      <div className="space-y-8">
+        <div className="border-t border-gray-200 pt-8">
+          <h2 className="text-responsive-lg font-bold text-gray-900 mb-6 flex items-center">
+            💬 Обсуждение
+          </h2>
+          
+          {/* Comment Form */}
+          <div className="mb-8">
+            <CommentForm postId={postId} onSuccess={handleCommentCreated} />
+          </div>
+          
+          {/* Comment List */}
+          <CommentList postId={postId} />
+        </div>
       </div>
     </div>
   );

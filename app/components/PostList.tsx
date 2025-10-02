@@ -408,11 +408,11 @@ export default function PostList() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Блог посты</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+        <h2 className="text-responsive-lg font-bold text-gray-900">Последние посты</h2>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {user ? (
             <>
               <span className="text-gray-600 mr-2">
@@ -420,30 +420,24 @@ export default function PostList() {
               </span>
               <button
                 onClick={() => setShowPostForm(!showPostForm)}
-                className="bg-blue-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="btn btn-primary w-full sm:w-auto"
               >
-                {showPostForm ? 'Скрыть форму' : 'Создать новый пост'}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white text-sm px-6 py-2 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-              >
-                Выйти
+                {showPostForm ? '📝 Скрыть форму' : '✍️ Создать пост'}
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={loginToSite}
-                className="bg-blue-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="btn btn-primary w-full sm:w-auto"
               >
-                Войти
+                🔐 Войти
               </button>
               <button
                 onClick={registerToSite}
-                className="bg-green-600 text-sm text-white px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                className="btn btn-success w-full sm:w-auto"
               >
-                Регистрация
+                📝 Регистрация
               </button>
             </>
           )}
@@ -451,37 +445,40 @@ export default function PostList() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="card p-6 mb-8 animate-slide-in">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          🔍 Фильтры
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Автор</label>
+            <label className="form-label">👤 Автор</label>
             <input
               type="text"
               value={authorFilter}
               onChange={(e) => setAuthorFilter(e.target.value)}
               placeholder="Имя автора"
-              className="w-full h-8 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="form-input"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Тег</label>
+            <label className="form-label">#️⃣ Тег</label>
             <input
               type="text"
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
               placeholder="Напр. react"
-              className="w-full h-8 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="form-input"
             />
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
             <button
               onClick={() => {
                 setAppliedAuthorFilter(authorFilter.trim());
                 setAppliedTagFilter(tagFilter.trim());
               }}
-              className="px-4 py-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="btn btn-primary flex-1"
             >
-              Применить
+              ✅ Применить
             </button>
             <button
               onClick={() => { 
@@ -490,14 +487,21 @@ export default function PostList() {
                 setAppliedAuthorFilter('');
                 setAppliedTagFilter('');
               }}
-              className="px-4 py-2 text-xs bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+              className="btn btn-outline flex-1"
             >
-              Сбросить
+              🗑️ Сбросить
             </button>
           </div>
         </div>
-        {(authorFilter || tagFilter) && (
-          <div className="mt-2 text-sm text-gray-600">Фильтры активны</div>
+        {(appliedAuthorFilter || appliedTagFilter) && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center text-sm text-blue-800">
+              <span className="mr-2">🎯</span>
+              Активные фильтры:
+              {appliedAuthorFilter && <span className="ml-2 px-2 py-1 bg-blue-100 rounded">Автор: {appliedAuthorFilter}</span>}
+              {appliedTagFilter && <span className="ml-2 px-2 py-1 bg-blue-100 rounded">Тег: {appliedTagFilter}</span>}
+            </div>
+          </div>
         )}
       </div>
 
@@ -510,13 +514,16 @@ export default function PostList() {
 
       {/* Login Form */}
       {showLoginForm && (
-        <div className="mb-8">
-          <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+        <div className="mb-8 animate-fade-in">
+          <div className="max-w-md mx-auto card p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Вход в систему</h2>
+              <h2 className="text-responsive-lg font-bold text-gray-900 flex items-center">
+                🔐 Вход в систему
+              </h2>
               <button
                 onClick={closeAuthForms}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+                aria-label="Закрыть"
               >
                 ×
               </button>
@@ -533,7 +540,7 @@ export default function PostList() {
                   onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                   type="email"
                   id="login-email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                   placeholder="Введите ваш email..."
                 />
                 {fieldErrors.email && (
@@ -551,7 +558,7 @@ export default function PostList() {
                   onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                   type="password"
                   id="login-password"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                   placeholder="Введите ваш пароль..."
                 />
                 {fieldErrors.password && (
@@ -575,9 +582,9 @@ export default function PostList() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-primary w-full"
                 >
-                  {isSubmitting ? 'Вход...' : 'Войти'}
+                  {isSubmitting ? '🔄 Вход...' : '🔐 Войти'}
                 </button>
                 
                 <button
@@ -586,9 +593,9 @@ export default function PostList() {
                     setShowLoginForm(false);
                     setShowRegisterForm(true);
                   }}
-                  className="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="btn btn-secondary w-full"
                 >
-                  Нет аккаунта? Зарегистрироваться
+                  📝 Нет аккаунта? Зарегистрироваться
                 </button>
               </div>
             </form>
@@ -598,13 +605,16 @@ export default function PostList() {
 
       {/* Registration Form */}
       {showRegisterForm && (
-        <div className="mb-8">
-          <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+        <div className="mb-8 animate-fade-in">
+          <div className="max-w-md mx-auto card p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Регистрация</h2>
+              <h2 className="text-responsive-lg font-bold text-gray-900 flex items-center">
+                📝 Регистрация
+              </h2>
               <button
                 onClick={closeAuthForms}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+                aria-label="Закрыть"
               >
                 ×
               </button>
@@ -699,9 +709,9 @@ export default function PostList() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-primary w-full"
                 >
-                  {isSubmitting ? 'Регистрация...' : 'Зарегистрироваться'}
+                  {isSubmitting ? '🔄 Регистрация...' : '🎉 Зарегистрироваться'}
                 </button>
                 
                 <button
@@ -710,9 +720,9 @@ export default function PostList() {
                     setShowRegisterForm(false);
                     setShowLoginForm(true);
                   }}
-                  className="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="btn btn-secondary w-full"
                 >
-                  Уже есть аккаунт? Войти
+                  🔐 Уже есть аккаунт? Войти
                 </button>
               </div>
             </form>
@@ -721,81 +731,105 @@ export default function PostList() {
       )}
 
       {/* Posts List */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {!posts || posts.length === 0 ? (
-          <div className="text-center py-12">
-            <h2 className="text-xl text-gray-600 mb-2">Пока нет постов</h2>
-            <p className="text-gray-500">Создайте первый пост, чтобы начать!</p>
+          <div className="text-center py-16 animate-fade-in">
+            <div className="text-6xl mb-4">📝</div>
+            <h2 className="text-responsive-lg text-gray-600 mb-2">Пока нет постов</h2>
+            <p className="text-gray-500 mb-6">Создайте первый пост, чтобы начать!</p>
+            {user && (
+              <button
+                onClick={() => setShowPostForm(true)}
+                className="btn btn-primary"
+              >
+                ✍️ Создать первый пост
+              </button>
+            )}
           </div>
         ) : (
-          posts.map((post) => (
-            <div key={post.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-              {/* Post Header */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {posts.map((post) => (
+              <article key={post.id} className="card card-hover p-6 animate-fade-in group">
+                {/* Post Header */}
+                <header className="mb-4">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
                     <Link href={`/posts/${post.id}`} className="hover:underline">
                       {post.title}
                     </Link>
                   </h2>
-                  <div className="flex items-center text-sm text-gray-500 space-x-4">
+                  <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2">
                     <button
                       type="button"
                       onClick={() => { setAuthorFilter(post.authorName || ''); setAppliedAuthorFilter(post.authorName || ''); }}
-                      className="text-left hover:underline"
+                      className="flex items-center hover:text-blue-600 transition-colors"
                     >
-                      👤 {post.authorName}
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-semibold mr-2">
+                        {post.authorName.charAt(0).toUpperCase()}
+                      </div>
+                      {post.authorName}
                     </button>
-                    <span>📅 {formatDate(post.createdAt)}</span>
-                    <span>❤️ {post.likes}</span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                      </svg>
+                      {formatDate(post.createdAt)}
+                    </span>
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                      </svg>
+                      {post.likes}
+                    </span>
                   </div>
-                </div>
-                {user && user.uid === post.authorId && (
-                  <div className="flex gap-2">
-                    {editingPostId === post.id ? (
-                      <>
-                        <button
-                          onClick={() => submitEditPost(post.id)}
-                          disabled={isEditing}
-                          className="bg-green-600  text-xs text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
-                        >
-                          Сохранить
-                        </button>
-                        <button
-                          onClick={cancelEditPost}
-                          className="bg-gray-500 text-xs text-white px-4 py-2 rounded-lg hover:bg-gray-600"
-                        >
-                          Отмена
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => beginEditPost(post)}
-                          className="bg-yellow-500 text-xs text-white px-4 py-2 rounded-lg hover:bg-yellow-600"
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          onClick={() => handleDeletePost(post)}
-                          className="bg-red-600 text-xs text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                        >
-                          Удалить
-                        </button>
-                      </>
-                    )}
+                </header>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleLike(post)}
+                      className={`btn text-xs px-3 py-1 rounded-full transition-all ${likedPostIds.includes(post.id) ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
+                    >
+                      {likedPostIds.includes(post.id) ? '💗 Лайкнуто' : '❤️ Лайк'}
+                    </button>
                   </div>
-                )}
-                {/* Like Button */}
-                <div className="ml-4">
-                  <button
-                    onClick={() => handleToggleLike(post)}
-                    className={`text-xs px-3 py-1 rounded-full ${likedPostIds.includes(post.id) ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}
-                  >
-                    {likedPostIds.includes(post.id) ? '💗 Лайкнуто' : '❤️ Лайк'}
-                  </button>
+                  
+                  {user && user.uid === post.authorId && (
+                    <div className="flex gap-2">
+                      {editingPostId === post.id ? (
+                        <>
+                          <button
+                            onClick={() => submitEditPost(post.id)}
+                            disabled={isEditing}
+                            className="btn btn-success text-xs"
+                          >
+                            💾 Сохранить
+                          </button>
+                          <button
+                            onClick={cancelEditPost}
+                            className="btn btn-secondary text-xs"
+                          >
+                            ❌ Отмена
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => beginEditPost(post)}
+                            className="btn btn-warning text-xs"
+                          >
+                            ✏️ Изменить
+                          </button>
+                          <button
+                            onClick={() => handleDeletePost(post)}
+                            className="btn btn-danger text-xs"
+                          >
+                            🗑️ Удалить
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
 
               {/* Post Content or Edit Form */}
               {editingPostId === post.id ? (
@@ -851,41 +885,51 @@ export default function PostList() {
                   </div>
                 </div>
               ) : (
-                <div className="prose max-w-none mb-4 max-h-[150px] overflow-hidden relative">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {post.content}
-                  </p>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white"></div>
+                <div className="mb-4">
+                  <div className="prose max-w-none max-h-32 overflow-hidden relative">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-sm sm:text-base">
+                      {post.content}
+                    </p>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white"></div>
+                  </div>
                 </div>
               )}
 
-              {/* Tags */}
-              {post.tags && post.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag, index) => (
-                    <button
-                      type="button"
-                      key={index}
-                      onClick={() => { setTagFilter(tag); setAppliedTagFilter(tag); }}
-                      className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full hover:bg-blue-200"
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-                </div>
-              )}
+                {/* Tags and Actions */}
+                <footer className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {post.tags && post.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {post.tags.slice(0, 3).map((tag, index) => (
+                        <button
+                          type="button"
+                          key={index}
+                          onClick={() => { setTagFilter(tag); setAppliedTagFilter(tag); }}
+                          className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full hover:bg-blue-200 transition-colors"
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                      {post.tags.length > 3 && (
+                        <span className="text-xs text-gray-500 px-2 py-1">
+                          +{post.tags.length - 3} еще
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-              {/* Open Post */}
-              <div className="mt-4">
-                <Link
-                  href={`/posts/${post.id}`}
-                  className="inline-block text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Открыть пост
-                </Link>
-              </div>
-            </div>
-          ))
+                  <Link
+                    href={`/posts/${post.id}`}
+                    className="btn btn-primary text-xs sm:text-sm flex items-center justify-center gap-2 hover:gap-3 transition-all"
+                  >
+                    Читать далее
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </footer>
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -225,24 +225,23 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
   
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-
-      <h3 className="text-3xl font-bold mb-6 text-center text-gray-800" onClick={createPost}>
-        Создать новый пост
+    <div className="max-w-2xl mx-auto card p-6 animate-fade-in">
+      <h3 className="text-responsive-lg font-bold mb-6 text-center text-gray-900 flex items-center justify-center gap-2" onClick={createPost}>
+        ✍️ Создать новый пост
       </h3>        
       
       <form onSubmit={onSubmit} className="space-y-6">
         {/* Заголовок поста */}
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-            Заголовок поста *
+          <label htmlFor="title" className="form-label">
+            📝 Заголовок поста *
           </label>
           <input
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
             type="text"
             id="title"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="form-input"
             placeholder="Введите заголовок поста..."
           />
           {fieldErrors.title && (
@@ -252,15 +251,15 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
 
         {/* Основной текст поста */}
         <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-            Основной текст поста *
+          <label htmlFor="content" className="form-label">
+            📄 Основной текст поста *
           </label>
           <textarea
             value={formData.content}
             onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
             id="content"
             rows={8}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="form-textarea"
             placeholder="Введите основной текст поста..."
           />
           {fieldErrors.content && (
@@ -270,8 +269,8 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
 
         {/* Теги */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Теги * (минимум 1, максимум 10)
+          <label className="form-label">
+            🏷️ Теги * (минимум 1, максимум 10)
           </label>
           <div className="space-y-2">
             {formData.tags?.map((tag, index) => (
@@ -280,15 +279,16 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
                   type="text"
                   value={tag}
                   onChange={(e) => updateTag(index, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input flex-1"
                   placeholder={`Тег ${index + 1}`}
                 />
                 <button
                   type="button"
                   onClick={() => removeTag(index)}
-                  className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="btn btn-danger px-3"
+                  aria-label="Удалить тег"
                 >
-                  Удалить
+                  🗑️
                 </button>
               </div>
             ))}
@@ -296,9 +296,9 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
               <button
                 type="button"
                 onClick={addTag}
-                className="px-4 py-2 bg-green-500 text-sm text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="btn btn-success text-sm"
               >
-                Добавить тег
+                ➕ Добавить тег
               </button>
             )}
           </div>
@@ -309,24 +309,46 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
 
 
         {/* Информация о пользователе */}
-        <div className="bg-gray-50 p-4 rounded-md">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Информация об авторе:</h3>
-          <p className="text-sm text-gray-600">
-            <strong>ID:</strong> {user.uid}
-          </p>
-          <p className="text-sm text-gray-600">
-            <strong>Имя:</strong> {user.displayName || user.email || 'Анонимный пользователь'}
-          </p>
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+          <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
+            👤 Информация об авторе
+          </h3>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+              {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blue-900">
+                {user.displayName || user.email || 'Анонимный пользователь'}
+              </p>
+              <p className="text-xs text-blue-600">
+                ID: {user.uid.slice(0, 8)}...
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Кнопки */}
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="submit"
             disabled={isSubmitting || !isOnline}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary flex-1 flex items-center justify-center gap-2"
           >
-            {isSubmitting ? 'Создание...' : !isOnline ? 'Нет подключения' : 'Создать пост'}
+            {isSubmitting ? (
+              <>
+                <div className="loading-spinner"></div>
+                Создание...
+              </>
+            ) : !isOnline ? (
+              <>
+                📡 Нет подключения
+              </>
+            ) : (
+              <>
+                🚀 Создать пост
+              </>
+            )}
           </button>
           <button
             type="button"
@@ -334,9 +356,9 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
               setFormData({ title: '', content: '', tags: [] });
               setFieldErrors({});
             }}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="btn btn-secondary sm:w-auto"
           >
-            Очистить
+            🧹 Очистить
           </button>
         </div>
       </form>

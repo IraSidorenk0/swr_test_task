@@ -114,27 +114,32 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
 
   if (!user) {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg text-center">
-        <p className="text-gray-600 text-sm">Для добавления комментария необходимо войти в систему</p>
+      <div className="card p-6 text-center animate-fade-in">
+        <div className="text-4xl mb-3">🔒</div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Авторизация требуется</h3>
+        <p className="text-gray-600 text-sm mb-4">Для добавления комментария необходимо войти в систему</p>
+        <p className="text-xs text-gray-500">Войдите через навигационное меню вверху страницы</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Добавить комментарий</h3>
+    <div className="card p-6 animate-fade-in">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        ✍️ Добавить комментарий
+      </h3>
       
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-            Ваш комментарий *
+          <label htmlFor="content" className="form-label">
+            💬 Ваш комментарий *
           </label>
           <textarea
             value={formData.content}
             onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
             id="content"
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="form-textarea"
             placeholder="Напишите ваш комментарий..."
           />
           {fieldErrors.content && (
@@ -154,13 +159,22 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
         )}
 
         {/* Кнопки */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="btn btn-primary flex-1 flex items-center justify-center gap-2"
           >
-            {isSubmitting ? 'Добавление...' : 'Добавить комментарий'}
+            {isSubmitting ? (
+              <>
+                <div className="loading-spinner"></div>
+                Добавление...
+              </>
+            ) : (
+              <>
+                📨 Опубликовать
+              </>
+            )}
           </button>
           <button
             type="button"
@@ -169,9 +183,9 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
               setFieldErrors({});
               setSubmitMessage('');
             }}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
+            className="btn btn-secondary sm:w-auto"
           >
-            Очистить
+            🧹 Очистить
           </button>
         </div>
       </form>
