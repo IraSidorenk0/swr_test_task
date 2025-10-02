@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc, increment, getDoc as getDocOnce, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase/firebase';
 import { Post } from '../types';
+import InlineNotice from './InlineNotice';
+import Link from 'next/link';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
 
@@ -17,6 +19,7 @@ export default function PostDetail({ postId }: PostDetailProps) {
   const [error, setError] = useState<Error | null>(null);
   const [liking, setLiking] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [showLoginNotice, setShowLoginNotice] = useState(false);
 
   // Fetch post function
   const fetchPost = async () => {
@@ -45,7 +48,7 @@ export default function PostDetail({ postId }: PostDetailProps) {
   const handleLike = async () => {
     const user = auth.currentUser;
     if (!user) {
-      alert('Войдите, чтобы поставить лайк.');
+      setShowLoginNotice(true);
       return;
     }
     if (!post) return;
@@ -233,6 +236,18 @@ export default function PostDetail({ postId }: PostDetailProps) {
 
         {/* Post Content */}
         <div className="prose prose-lg max-w-none mb-8">
+          {showLoginNotice && (
+            <div className="mb-4">
+              <InlineNotice
+                tone="info"
+                message="Войдите в аккаунт, чтобы поставить лайк."
+                actionLabel="Войти"
+                onAction={() => {
+                  window.location.href = '/auth';
+                }}
+              />
+            </div>
+          )}
           <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-responsive-base">
             {post.content}
           </div>

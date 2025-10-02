@@ -155,7 +155,8 @@ export default function PostList() {
 
   const handleToggleLike = async (post: Post) => {
     if (!user) {
-      alert('Войдите, чтобы поставить лайк.');
+      setAuthMode('login');
+      setShowAuthModal(true);
       return;
     }
     const userId = user.uid;
