@@ -5,7 +5,6 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase/firebase';
 import { Post, PostFormData } from '../types';
 import PostForm from './PostForm';
-import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchPosts, updatePost, deletePost, toggleLike, fetchLikedStates, optimisticToggleLike, revertOptimisticLike } from '../../store/slices/postsSlice';
 import AuthModal from './AuthModal';

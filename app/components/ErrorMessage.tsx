@@ -16,7 +16,7 @@ export default function ErrorMessage({
   showTroubleshooting = false 
 }: ErrorMessageProps) {
   return (
-    <div className="flex justify-center items-center min-h-screen">
+    <div className="flex justify-center items-center">
       <div className="text-red-500 text-center max-w-md">
         <h2 className="text-xl font-bold mb-2">{title}</h2>
         <p className="mb-4">{message}</p>
