@@ -23,14 +23,14 @@ export default function ErrorMessage({
         
         {showTroubleshooting && (
           <div className="text-sm text-gray-600 bg-gray-100 p-4 rounded-lg">
-            <p className="font-semibold mb-2">Возможные причины:</p>
+            <p className="font-semibold mb-2">Reasons:</p>
             <ul className="text-left space-y-1">
-              <li>• Проверьте настройки Firebase Security Rules</li>
-              <li>• Убедитесь, что Firestore Database инициализирован</li>
-              <li>• Проверьте подключение к интернету</li>
+              <li>• Check file FIREBASE_SETUP_GUIDE.md</li>
+              <li>• Ensure that Firestore Database is initialized</li>
+              <li>• Check your internet connection</li>
             </ul>
             <p className="mt-2 text-xs">
-              См. файл FIREBASE_SETUP_GUIDE.md для подробных инструкций
+              See file FIREBASE_SETUP_GUIDE.md for detailed instructions
             </p>
           </div>
         )}
@@ -42,7 +42,7 @@ export default function ErrorMessage({
                 onClick={onRetry}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
-                Попробовать снова
+                Retry
               </button>
             )}
             {onRefresh && (
@@ -50,7 +50,7 @@ export default function ErrorMessage({
                 onClick={onRefresh}
                 className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
               >
-                Обновить
+                Update
               </button>
             )}
           </div>

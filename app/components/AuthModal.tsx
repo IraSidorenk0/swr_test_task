@@ -27,7 +27,7 @@ export default function AuthModal({ isVisible, initialMode = 'login', onClose }:
         <button
           onClick={onClose}
           className="absolute -top-4 -right-4 bg-white rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 text-xl font-bold shadow-lg z-10"
-          aria-label="Закрыть"
+          aria-label="Close"
         >
           ×
         </button>

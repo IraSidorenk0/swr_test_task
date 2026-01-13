@@ -1,33 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchComments } from '../../store/slices/commentsSlice';
+import { useComments } from '../../hooks/useComments';
+import { Timestamp } from 'firebase/firestore';
 
 interface CommentListProps {
   postId: string;
 }
 
 export default function CommentList({ postId }: CommentListProps) {
-  const dispatch = useAppDispatch();
-  const { commentsByPost, loading, error } = useAppSelector((state) => state.comments);
-  const comments = commentsByPost[postId] || [];
+  const { comments, isLoading: loading, error, mutate } = useComments(postId);
 
-
-  // Fetch comments on component mount and when postId changes
-  useEffect(() => {
-    if (postId) {
-      dispatch(fetchComments(postId));
-    }
-  }, [dispatch, postId]);
-
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: Date | string | Timestamp) => {
     if (!timestamp) return 'Дата неизвестна';
     
     try {
+      let date: Date;
+      
       // Handle Firebase Timestamp
-      if (timestamp.toDate) {
-        return timestamp.toDate().toLocaleDateString('ru-RU', {
+      if (timestamp instanceof Timestamp) {
+        return timestamp.toDate().toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
@@ -36,7 +27,7 @@ export default function CommentList({ postId }: CommentListProps) {
         });
       }
       // Handle regular Date
-      return new Date(timestamp).toLocaleDateString('ru-RU', {
+      return new Date(timestamp).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -44,14 +35,14 @@ export default function CommentList({ postId }: CommentListProps) {
         minute: '2-digit'
       });
     } catch (error) {
-      return 'Дата неизвестна';
+      return 'Date unknown';
     }
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="text-gray-500">Загрузка комментариев...</div>
+        <div className="text-gray-500">Loading comments...</div>
       </div>
     );
   }
@@ -60,13 +51,13 @@ export default function CommentList({ postId }: CommentListProps) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="text-red-600 text-center">
-          <h3 className="font-semibold mb-2">Ошибка загрузки комментариев</h3>
-          <p className="text-sm mb-3">{error}</p>
+          <h3 className="font-semibold mb-2">Error loading comments</h3>
+          <p className="text-sm mb-3">{error.message || 'Failed to load comments'}</p>
           <button
-            onClick={() => dispatch(fetchComments(postId))}
+            onClick={() => mutate()}
             className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
           >
-            Попробовать снова
+            Try again
           </button>
         </div>
       </div>
@@ -77,7 +68,7 @@ export default function CommentList({ postId }: CommentListProps) {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          💬 Комментарии 
+          💬 Comments 
           <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
             {comments.length}
           </span>
@@ -86,9 +77,9 @@ export default function CommentList({ postId }: CommentListProps) {
 
       {comments.length === 0 ? (
         <div className="text-center py-12 card animate-slide-in">
-          <div className="text-5xl mb-4">🤷‍♂️</div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Пока нет комментариев</h3>
-          <p className="text-sm text-gray-500">Будьте первым, кто оставит комментарий!</p>
+          <div className="text-5xl mb-4">🤷</div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No comments yet</h3>
+          <p className="text-sm text-gray-500">Be the first to leave a comment!</p>
         </div>
       ) : (
         <div className="space-y-4">

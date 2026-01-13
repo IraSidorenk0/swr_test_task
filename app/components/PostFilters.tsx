@@ -1,87 +1,76 @@
 'use client';
-
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 interface PostFiltersProps {
   authorFilter: string;
   tagFilter: string;
-  appliedAuthorFilter: string;
-  appliedTagFilter: string;
   onAuthorFilterChange: (value: string) => void;
   onTagFilterChange: (value: string) => void;
-  onApplyFilters: () => void;
+  onApplyFilters: (author: string, tag: string) => void;
   onResetFilters: () => void;
 }
 
-export default function PostFilters({
-  authorFilter,
-  tagFilter,
-  appliedAuthorFilter,
-  appliedTagFilter,
-  onAuthorFilterChange,
+export const PostFilters = ({ 
+  authorFilter, 
+  tagFilter, 
+  onAuthorFilterChange, 
   onTagFilterChange,
   onApplyFilters,
-  onResetFilters,
-}: PostFiltersProps) {
+  onResetFilters
+}: PostFiltersProps) => {
+  const [localAuthorFilter, setLocalAuthorFilter] = useState(authorFilter);
+  const [localTagFilter, setLocalTagFilter] = useState(tagFilter);
+
+  const handleApply = () => {
+    onAuthorFilterChange(localAuthorFilter);
+    onTagFilterChange(localTagFilter);
+    onApplyFilters(localAuthorFilter, localTagFilter);
+  };
+
+  const handleReset = () => {
+    setLocalAuthorFilter('');
+    setLocalTagFilter('');
+    onResetFilters();
+  };
+
   return (
-    <div className="card p-6 mb-8 animate-slide-in">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        🔍 Фильтры
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="form-label">👤 Автор</label>
+          <label className="form-label">👤 Author</label>
           <input
             type="text"
-            value={authorFilter}
-            onChange={(e) => onAuthorFilterChange(e.target.value)}
-            placeholder="Имя автора"
+            value={localAuthorFilter}
+            onChange={(e) => setLocalAuthorFilter(e.target.value)}
+            placeholder="Author name"
             className="form-input"
           />
         </div>
         <div>
-          <label className="form-label">#️⃣ Тег</label>
+          <label className="form-label">#️⃣ Tag</label>
           <input
             type="text"
-            value={tagFilter}
-            onChange={(e) => onTagFilterChange(e.target.value)}
-            placeholder="Напр. react"
+            value={localTagFilter}
+            onChange={(e) => setLocalTagFilter(e.target.value)}
+            placeholder="Tag name"
             className="form-input"
           />
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
-          <button
-            onClick={onApplyFilters}
-            className="btn btn-primary flex-1"
-          >
-            ✅ Применить
-          </button>
-          <button
-            onClick={onResetFilters}
-            className="btn btn-outline flex-1"
-          >
-            🗑️ Сбросить
-          </button>
         </div>
       </div>
-      {(appliedAuthorFilter || appliedTagFilter) && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center text-sm text-blue-800">
-            <span className="mr-2">🎯</span>
-            Активные фильтры:
-            {appliedAuthorFilter && (
-              <span className="ml-2 px-2 py-1 bg-blue-100 rounded">
-                Автор: {appliedAuthorFilter}
-              </span>
-            )}
-            {appliedTagFilter && (
-              <span className="ml-2 px-2 py-1 bg-blue-100 rounded">
-                Тег: {appliedTagFilter}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="flex space-x-2 mt-4">
+        <button
+          onClick={handleApply}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          Apply filters
+        </button>
+        <button
+          onClick={handleReset}
+          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+        >
+          Reset filters
+        </button>
+      </div>
     </div>
   );
-}
+};

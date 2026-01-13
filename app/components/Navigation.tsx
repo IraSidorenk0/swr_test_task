@@ -1,28 +1,47 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { useState } from 'react';
+import { signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '../../firebase/firebase';
+import { signOut } from '../../firebase/actions';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
-export default function Navigation() {
-  const [user, setUser] = useState<any>(null);
+type User = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+};
+
+interface NavigationProps {
+  currentUser: User | null;
+  commentsCount?: number;
+}
+
+export default function Navigation({ currentUser, commentsCount = 0 }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      setIsMenuOpen(false);
+      // Sign out from Firebase client-side
+      await firebaseSignOut(auth);
+      
+      // Clear server-side session
+      const result = await signOut();
+      
+      if (result.success) {
+        setIsMenuOpen(false);
+        // Refresh the page to update the UI
+        router.refresh();
+      } else {
+        console.error('Failed to sign out from server');
+      }
     } catch (error) {
-      console.error('Ошибка при выходе:', error);
+      console.error('Error during sign out:', error);
     }
   };
 
@@ -50,25 +69,42 @@ export default function Navigation() {
               href="/" 
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
-              Главная
+              Home
             </Link>
             
-            {user ? (
+            {currentUser ? (
               <>
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                    {currentUser.photoURL ? (
+                      <Image 
+                        className="h-8 w-8 rounded-full" 
+                        src={currentUser.photoURL} 
+                        alt="User avatar"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                        {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="block text-sm text-gray-700">
+                        {currentUser.email}
+                      </span>
+                      {commentsCount > 0 && (
+                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                          <span className="mr-1">❤️</span>
+                          {commentsCount} {commentsCount === 1 ? 'comment' : 'comments'}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-sm text-gray-700 max-w-32 truncate">
-                      {user.displayName || user.email}
-                    </span>
                   </div>
                   <button
                     onClick={handleLogout}
                     className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                   >
-                    Выйти
+                    Logout
                   </button>
                 </div>
               </>
@@ -78,13 +114,13 @@ export default function Navigation() {
                   href="/auth" 
                   className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
-                  Войти
+                  Login
                 </Link>
                 <Link 
                   href="/auth" 
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                  Регистрация
+                  Registration
                 </Link>
               </div>
             )}
@@ -117,24 +153,41 @@ export default function Navigation() {
                 className="block text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Главная
+                Home
               </Link>
               
-              {user ? (
+              {currentUser ? (
                 <div className="space-y-2">
                   <div className="flex items-center px-3 py-2">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-3">
-                      {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                    {currentUser.photoURL ? (
+                      <Image
+                        className="h-8 w-8 rounded-full" 
+                        src={currentUser.photoURL} 
+                        alt="User avatar"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-3">
+                        {(currentUser.displayName || currentUser.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-700">
+                        {currentUser.email}
+                      </span>
+                      {commentsCount > 0 && (
+                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                          <span className="mr-1">❤️</span>
+                          {commentsCount} {commentsCount === 1 ? 'comment' : 'comments'}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-sm text-gray-700">
-                      {user.displayName || user.email}
-                    </span>
                   </div>
                   <button
                     onClick={handleLogout}
                     className="block w-full text-left text-red-600 hover:text-red-800 px-3 py-2 rounded-md text-base font-medium transition-colors"
                   >
-                    Выйти
+                    Logout
                   </button>
                 </div>
               ) : (
@@ -144,14 +197,14 @@ export default function Navigation() {
                     className="block text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium transition-colors"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Войти
+                    Login
                   </Link>
                   <Link 
                     href="/auth" 
                     className="block bg-blue-600 text-white px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors mx-3"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Регистрация
+                    Registration
                   </Link>
                 </div>
               )}

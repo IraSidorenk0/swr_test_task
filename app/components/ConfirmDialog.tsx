@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-
 type ConfirmDialogProps = {
   isOpen: boolean;
   title?: string;
@@ -14,26 +12,13 @@ type ConfirmDialogProps = {
 
 export default function ConfirmDialog({
   isOpen,
-  title = 'Подтвердите действие',
-  description = 'Вы уверены? Это действие необратимо.',
-  confirmText = 'Удалить',
-  cancelText = 'Отмена',
+  title = 'Approve action',
+  description = 'Are you sure? This action is irreversible.',
+  confirmText = 'Approve',
+  cancelText = 'Cancel',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel();
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', onKeyDown);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 

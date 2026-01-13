@@ -1,18 +1,25 @@
+'use server';
 import PostList from './components/PostList';
+import { getPosts } from '../store/slices/postsActions';
+import { getCurrentUser } from '../firebase/auth';
 
-export default function Home() {
+export default async function Home() {
+  const authorFilter = '';
+  const tagFilter = '';
+  const posts = await getPosts(authorFilter, tagFilter);
+  const currentUser = await getCurrentUser();
   return (
     <div className="container-responsive py-8">
       <div className="text-center mb-12">
         <h1 className="text-responsive-xl font-bold text-gray-900 mb-4">
-          Добро пожаловать в блог
+          Welcome to the blog
         </h1>
         <p className="text-responsive-base text-gray-600 max-w-2xl mx-auto">
-          Современный блог, созданный с использованием Next.js, Firebase и Redux. 
-          Делитесь своими мыслями и идеями с сообществом.
+          Modern blog created with Next.js, Firebase and Swr. 
+          Share your thoughts and ideas with the community.
         </p>
       </div>
-      <PostList />
+      <PostList posts={posts} currentUser={currentUser}/>
     </div>
   );
 }

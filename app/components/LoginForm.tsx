@@ -1,10 +1,10 @@
 'use client';
 
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useState } from 'react';
 import { z } from 'zod';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase/firebase';
-import { LoginFormData } from '../types';
+import { signInAction } from '../../firebase/actions';
 
 // Zod schema for login validation
 const loginSchema = z.object({
@@ -19,68 +19,63 @@ const loginSchema = z.object({
 interface LoginFormProps {
   onSuccess?: () => void;
   onSwitchToRegister?: () => void;
+  callbackUrl?: string;
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${pending ? 'opacity-50 cursor-not-allowed' : ''}`}
+    >
+      {pending ? 'Login...' : 'Login'}
+    </button>
+  );
 }
 
 export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState('');
-  const [formData, setFormData] = useState<LoginFormData>({
-    email: '',
-    password: ''
-  });
-
+  const [_, formAction] = useActionState(signInAction, null);
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
-
-  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const onSubmit = async (formData: FormData) => {
     setIsSubmitting(true);
-    setSubmitMessage('');
+    // Client-side validation
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    
+    // Update local state
+    setFormData({ email, password });
+    
+    const parsed = loginSchema.safeParse({ email, password });
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      setFieldErrors({
+        email: flat.fieldErrors.email?.[0],
+        password: flat.fieldErrors.password?.[0]
+      });
+      return;
+    }
+    
+    // Clear previous errors
     setFieldErrors({});
-
-    try {
-      const parsed = loginSchema.safeParse(formData);
-      if (!parsed.success) {
-        const flat = parsed.error.flatten();
-        setFieldErrors({
-          email: flat.fieldErrors.email?.[0],
-          password: flat.fieldErrors.password?.[0]
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      const validData = parsed.data;
-      await signInWithEmailAndPassword(auth, validData.email, validData.password);
-      
-      setSubmitMessage('Успешный вход в систему!');
-      
-      // Call onSuccess callback if provided
+    
+    // Call server action
+    const result = await signInAction(null, formData);
+    
+    if (result?.success) {
+      setSubmitMessage('Login successful!');
+      setIsSubmitting(false);
       if (onSuccess) {
-        setTimeout(() => {
-          onSuccess();
-        }, 1500);
+        setTimeout(() => onSuccess(), 1500);
       }
-    } catch (error: any) {
-      console.error('Ошибка при входе:', error);
-      
-      let errorMessage = 'Ошибка при входе в систему. Попробуйте снова.';
-      
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'Пользователь с таким email не найден.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Неверный пароль.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Некорректный email.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Слишком много попыток входа. Попробуйте позже.';
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = 'Ошибка сети. Проверьте подключение к интернету.';
-      } else if (error.message) {
-        errorMessage = `Ошибка: ${error.message}`;
-      }
-      
-      setSubmitMessage(errorMessage);
-    } finally {
+    } else {
+      setSubmitMessage(result?.error || 'Error logging in');
       setIsSubmitting(false);
     }
   };
@@ -88,22 +83,28 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        Вход в систему
+        Login
       </h1>
       
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form action={formAction} onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        onSubmit(formData);
+      }} className="space-y-6">
         {/* Email */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
             Email *
           </label>
           <input
-            value={formData.email}
-            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-            type="email"
             id="email"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Введите ваш email..."
+            name="email"
+            type="email"
+            value={formData.email || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+            autoComplete="email"
+            className={`mt-1 block w-full px-3 py-2 border ${fieldErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+            placeholder="Enter your email..."
           />
           {fieldErrors.email && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
@@ -113,15 +114,17 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
         {/* Password */}
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Пароль *
+            Password *
           </label>
           <input
-            value={formData.password}
+            name="password"
+            value={formData.password || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
             type="password"
             id="password"
+            autoComplete="current-password"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Введите ваш пароль..."
+            placeholder="Enter your password..."
           />
           {fieldErrors.password && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.password}</p>
@@ -131,7 +134,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
         {/* Сообщение о результате */}
         {submitMessage && (
           <div className={`p-4 rounded-md ${
-            submitMessage.includes('Успешный') 
+            submitMessage.includes('successful') 
               ? 'bg-green-100 text-green-800' 
               : 'bg-red-100 text-red-800'
           }`}>
@@ -146,7 +149,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Вход...' : 'Войти'}
+            {isSubmitting ? 'Login...' : 'Login'}
           </button>
           
           {onSwitchToRegister && (
@@ -155,7 +158,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
               onClick={onSwitchToRegister}
               className="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
-              Нет аккаунта? Зарегистрироваться
+              No account? Register
             </button>
           )}
         </div>

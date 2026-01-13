@@ -5,7 +5,7 @@ interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export default function LoadingSpinner({ message = 'Загрузка...', size = 'md' }: LoadingSpinnerProps) {
+export default function LoadingSpinner({ message = 'Loading...', size = 'md' }: LoadingSpinnerProps) {
   const sizeClasses = {
     sm: 'min-h-32',
     md: 'min-h-64',

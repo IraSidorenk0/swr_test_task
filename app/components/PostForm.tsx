@@ -4,47 +4,59 @@ import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, getConnectionStatus } from '../../firebase/firebase';
-import { useAppDispatch } from '../../store/hooks';
-import * as postsActions from '../../store/slices/postsSlice';
+import { PostFormData } from '../types';
+
 import TagManager from './TagManager';
 import UserInfo from './UserInfo';
 import LoadingSpinner from './LoadingSpinner';
+import { AppUser } from '../types';
 
 // Zod schema for post validation
 const postSchema = z.object({
   title: z.string()
-    .min(1, 'Заголовок поста обязателен')
-    .min(5, 'Заголовок должен содержать минимум 5 символов')
-    .max(100, 'Заголовок не должен превышать 100 символов'),
+    .min(1, 'Title is required')
+    .min(5, 'Title must contain at least 5 characters')
+    .max(100, 'Title cannot exceed 100 characters'),
   content: z.string()
-    .min(1, 'Основной текст поста обязателен')
-    .min(10, 'Основной текст должен содержать минимум 10 символов')
-    .max(5000, 'Основной текст не должен превышать 5000 символов'),
+    .min(1, 'Content is required')
+    .min(10, 'Content must contain at least 10 characters')
+    .max(5000, 'Main text cannot exceed 5000 characters'),
   tags: z.array(z.string())
-    .min(1, 'Добавьте хотя бы один тег')
-    .max(10, 'Максимум 10 тегов')
+    .min(1, 'Add at least one tag')
+    .max(10, 'Maximum 10 tags')
     .refine(tags => tags.every(tag => tag.trim().length > 0), {
-      message: 'Теги не могут быть пустыми'
-    })
+      message: 'Tags cannot be empty'
+    }),
+  likes: z.number().optional()
 });
 
-type PostFormData = z.infer<typeof postSchema>;
-
 interface PostFormProps {
+  currentUser: AppUser | null;
+  formData: PostFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PostFormData>>;
+  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onCancel: () => void;
+  errors: Record<string, string>;
+  isEditing?: boolean;
   onSuccess?: () => void;
+  isSubmitting?: boolean;
 }
 
-export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormProps) {
-  const dispatch = useAppDispatch();
+export default function PostForm({
+  currentUser,
+  formData, 
+  setFormData, 
+  onSubmit, 
+  onCancel, 
+  errors, 
+  isEditing = false,
+  onSuccess 
+}: PostFormProps) {
   const [user, loading, error] = useAuthState(auth);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [submitMessage, setSubmitMessage] = useState('');
   const [isOnline, setIsOnline] = useState(true);
-  const [formData, setFormData] = useState<PostFormData>({
-    title: '',
-    content: '',
-    tags: []
-  });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
 
@@ -64,25 +76,15 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
     setFormData(prev => ({ ...prev, tags }));
   };
 
-  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) {
-      setSubmitMessage('Ошибка: Пользователь не авторизован');
+    if (!currentUser) {
+      setSubmitMessage('Error: User is not authenticated');
       return;
     }
 
     if (!isOnline) {
-      setSubmitMessage('Ошибка: Нет подключения к интернету. Проверьте соединение.');
-      return;
-    }
-
-    // Check if user token is still valid
-    try {
-      const token = await user.getIdToken(true); // Force refresh
-      console.log('User token refreshed successfully');
-    } catch (authError) {
-      console.error('Token refresh failed:', authError);
-      setSubmitMessage('Ошибка аутентификации. Пожалуйста, войдите в систему снова.');
+      setSubmitMessage('Error: No internet connection. Please check your connection.');
       return;
     }
 
@@ -94,7 +96,8 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
       const dataToValidate: PostFormData = {
         title: formData.title,
         content: formData.content,
-        tags: (formData.tags || []).map(t => (t == null ? '' : t))
+        tags: (formData.tags || []).map((t: string | null) => (t == null ? '' : t)),
+        likes: formData.likes || 0
       };
 
       const parsed = postSchema.safeParse(dataToValidate);
@@ -123,14 +126,20 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         title: validData.title,
         content: validData.content,
         tags: cleanedTags,
-        authorId: user.uid,
-        authorName: user.displayName || user.email || 'Анонимный пользователь',
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName || currentUser.email || 'Anonymous User',
       };
       
-      await dispatch(postsActions.createPost(postData));
+      // Use the provided onSubmit handler which will handle both create and update
+      await onSubmit(e);
       
-      setSubmitMessage('Пост успешно создан!');
-      setFormData({ title: '', content: '', tags: [] });
+      if (isEditing) {
+        setSubmitMessage('Пост успешно обновлен!');
+      } else {
+        setSubmitMessage('Пост успешно создан!');
+        setFormData({ title: '', content: '', tags: [], likes: 0 });
+      }
+      
       setFieldErrors({});
       
       // Call onSuccess callback if provided
@@ -139,39 +148,33 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
           onSuccess();
         }, 1500); // Small delay to show success message
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('=== POST CREATION ERROR ===');
       console.error('Full error object:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Error details:', error.details);
-      console.error('Error stack:', error.stack);
-      console.error('===========================');
-      
-      // More specific error messages
-      let errorMessage = 'Ошибка при создании поста. Попробуйте снова.';
-      
-      if (error.code === 'permission-denied') {
-        errorMessage = 'Ошибка доступа. Проверьте настройки Firebase Security Rules. Убедитесь, что правила опубликованы в Firebase Console.';
-      } else if (error.code === 'unavailable') {
-        errorMessage = 'Firebase недоступен. Проверьте подключение к интернету.';
-      } else if (error.code === 'unauthenticated') {
-        errorMessage = 'Ошибка аутентификации. Пожалуйста, войдите в систему снова.';
-      } else if (error.code === 'invalid-argument') {
-        errorMessage = 'Неверные данные. Проверьте правильность заполнения полей.';
-      } else if (error.code === 'failed-precondition') {
-        errorMessage = 'Ошибка предварительных условий. Попробуйте обновить страницу.';
-      } else if (error.code === 'resource-exhausted') {
-        errorMessage = 'Превышены лимиты Firebase. Попробуйте позже.';
-      } else if (error.code === 'internal') {
-        errorMessage = 'Внутренняя ошибка Firebase. Попробуйте позже.';
-      } else if (error.message) {
-        errorMessage = `Ошибка: ${error.message}`;
+      if (error && typeof error === 'object') {
+        console.error('Error keys:', Object.keys(error));
       }
       
-      // Add debugging info to the error message in development
-      if (process.env.NODE_ENV === 'development') {
-        errorMessage += `\n\nDebug: ${error.code || 'unknown'} - ${error.message || 'no message'}`;
+      
+      // More specific error messages
+      let errorMessage = 'Error while creating post. Please try again.';
+      
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'permission-denied') {
+        errorMessage = 'Access error. Check Firebase Security Rules. Make sure the rules are published in Firebase Console.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'unavailable') {
+        errorMessage = 'Firebase is unavailable. Check your internet connection.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'unauthenticated') {
+        errorMessage = 'Authentication error. Please log in again.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'invalid-argument') {
+        errorMessage = 'Invalid data. Check the form fields.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'failed-precondition') {
+        errorMessage = 'Precondition failed. Please refresh the page.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'resource-exhausted') {
+        errorMessage = 'Firebase limits exceeded. Please try again later.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'internal') {
+        errorMessage = 'Internal Firebase error. Please try again later.';
+      } else if (error && typeof error === 'object' && 'message' in error && error.message) {
+        errorMessage = `Error: ${error.message}`;
       }
       
       setSubmitMessage(errorMessage);
@@ -187,23 +190,23 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
   if (error) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-red-500">Ошибка авторизации: {error.message}</div>
+        <div className="text-red-500">Auth error: {error.message}</div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!currentUser) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Авторизация необходима</h2>
-          <p className="text-gray-600">Для создания поста необходимо войти в систему</p>
+          <h2 className="text-2xl font-bold mb-4">Authorization required</h2>
+          <p className="text-gray-600">To create a post, you need to log in to the system</p>
         </div>
       </div>
     );
   } 
 
-   const createPost = () => {
+  const createPost = () => {
     // Logic to open the PostForm modal or navigate to the PostForm page
     // setShowPostForm(true);
   }
@@ -212,22 +215,22 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
   return (
     <div className="max-w-2xl mx-auto card p-6 animate-fade-in">
       <h3 className="text-responsive-lg font-bold mb-6 text-center text-gray-900 flex items-center justify-center gap-2" onClick={createPost}>
-        ✍️ Создать новый пост
+        {isEditing ? '✍️ Edit post' : '✍️ Create new post'}
       </h3>        
       
-      <form onSubmit={onSubmit} className="space-y-6">
-        {/* Заголовок поста */}
+      <form onSubmit={handleFormSubmit} className="space-y-6">
+        {/* Post title */}
         <div>
           <label htmlFor="title" className="form-label">
-            📝 Заголовок поста *
+            📝 Title *
           </label>
           <input
-            value={formData.title}
+            value={formData.title || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
             type="text"
             id="title"
             className="form-input"
-            placeholder="Введите заголовок поста..."
+            placeholder="Enter post title..."
           />
           {fieldErrors.title && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.title}</p>
@@ -237,22 +240,22 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
         {/* Основной текст поста */}
         <div>
           <label htmlFor="content" className="form-label">
-            📄 Основной текст поста *
+            📄 Content *
           </label>
           <textarea
-            value={formData.content}
+            value={formData.content || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
             id="content"
             rows={8}
             className="form-textarea"
-            placeholder="Введите основной текст поста..."
+            placeholder="Enter post content..."
           />
           {fieldErrors.content && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.content}</p>
           )}
         </div>
 
-        {/* Теги */}
+        {/* Tags */}
         <TagManager
           tags={formData.tags || []}
           onTagsChange={handleTagsChange}
@@ -261,9 +264,9 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
 
 
         {/* Информация о пользователе */}
-        <UserInfo user={user} />
+        <UserInfo user={currentUser} />
 
-        {/* Кнопки */}
+        {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="submit"
@@ -273,27 +276,27 @@ export default function PostForm({ onSuccess }: PostFormProps = {} as PostFormPr
             {isSubmitting ? (
               <>
                 <div className="loading-spinner"></div>
-                Создание...
+                {isEditing ? 'Updating...' : 'Creating...'}
               </>
             ) : !isOnline ? (
-              <>
-                📡 Нет подключения
-              </>
+              <>📡 No connection</>
             ) : (
-              <>
-                🚀 Создать пост
-              </>
+              <>{isEditing ? 'Update post' : 'Create post'}</>
             )}
           </button>
           <button
             type="button"
             onClick={() => {
-              setFormData({ title: '', content: '', tags: [] });
-              setFieldErrors({});
+              if (isEditing) {
+                onCancel();
+              } else {
+                setFormData({ title: '', content: '', tags: [], likes: 0 });
+                setFieldErrors({});
+              }
             }}
             className="btn btn-secondary sm:w-auto"
           >
-            🧹 Очистить
+            {isEditing ? '❌ Cancel' : '🧹 Clear'}
           </button>
         </div>
       </form>

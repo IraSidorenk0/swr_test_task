@@ -28,7 +28,7 @@ export default function TagManager({ tags, maxTags = 10, onTagsChange, error }: 
   return (
     <div>
       <label className="form-label">
-        🏷️ Теги * (минимум 1, максимум {maxTags})
+        🏷️ Tags * (minimum 1, maximum {maxTags})
       </label>
       <div className="space-y-2">
         {tags.map((tag, index) => (
@@ -38,13 +38,13 @@ export default function TagManager({ tags, maxTags = 10, onTagsChange, error }: 
               value={tag}
               onChange={(e) => updateTag(index, e.target.value)}
               className="form-input flex-1"
-              placeholder={`Тег ${index + 1}`}
+              placeholder={`Tag ${index + 1}`}
             />
             <button
               type="button"
               onClick={() => removeTag(index)}
               className="btn btn-danger px-3"
-              aria-label="Удалить тег"
+              aria-label="Remove tag"
             >
               🗑️
             </button>
@@ -56,7 +56,7 @@ export default function TagManager({ tags, maxTags = 10, onTagsChange, error }: 
             onClick={addTag}
             className="btn btn-success text-sm"
           >
-            ➕ Добавить тег
+            ➕ Add tag
           </button>
         )}
       </div>

@@ -73,7 +73,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
         displayName: validData.displayName
       });
       
-      setSubmitMessage('Регистрация прошла успешно! Добро пожаловать!');
+      setSubmitMessage('Registration successful! Welcome!');
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -81,23 +81,23 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
           onSuccess();
         }, 1500);
       }
-    } catch (error: any) {
-      console.error('Ошибка при регистрации:', error);
+    } catch (error: Error | unknown) {
+      console.error('Registration error:', error);
       
-      let errorMessage = 'Ошибка при регистрации. Попробуйте снова.';
+      let errorMessage = 'Registration error. Please try again.';
       
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'Пользователь с таким email уже существует.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Некорректный email.';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Пароль слишком слабый. Используйте более сложный пароль.';
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = 'Ошибка сети. Проверьте подключение к интернету.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Слишком много попыток регистрации. Попробуйте позже.';
-      } else if (error.message) {
-        errorMessage = `Ошибка: ${error.message}`;
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/email-already-in-use') {
+        errorMessage = 'User with this email already exists.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/invalid-email') {
+        errorMessage = 'Incorrect email.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/weak-password') {
+        errorMessage = 'Password too weak. Use a stronger password.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Check your internet connection.';
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many registration attempts. Please try again later.';
+      } else if (error && typeof error === 'object' && 'message' in error && error.message) {
+        errorMessage = `Error: ${error.message}`;
       }
       
       setSubmitMessage(errorMessage);
@@ -109,14 +109,14 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        Регистрация
+        Registration
       </h1>
       
       <form onSubmit={onSubmit} className="space-y-6">
         {/* Display Name */}
         <div>
           <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
-            Имя пользователя *
+            User name *
           </label>
           <input
             value={formData.displayName}
@@ -124,7 +124,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
             type="text"
             id="displayName"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Введите ваше имя..."
+            placeholder="Enter your name..."
           />
           {fieldErrors.displayName && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.displayName}</p>
@@ -142,7 +142,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
             type="email"
             id="email"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Введите ваш email..."
+            placeholder="Enter your email..."
           />
           {fieldErrors.email && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
@@ -152,7 +152,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
         {/* Password */}
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Пароль *
+            Password *
           </label>
           <input
             value={formData.password}
@@ -160,7 +160,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
             type="password"
             id="password"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Введите пароль (минимум 6 символов)..."
+            placeholder="Enter your password (minimum 6 characters)..."
           />
           {fieldErrors.password && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.password}</p>
@@ -170,7 +170,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
         {/* Confirm Password */}
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-            Подтвердите пароль *
+            Confirm Password *
           </label>
           <input
             value={formData.confirmPassword}
@@ -178,7 +178,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
             type="password"
             id="confirmPassword"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Подтвердите пароль..."
+            placeholder="Confirm Password..."
           />
           {fieldErrors.confirmPassword && (
             <p className="mt-1 text-sm text-red-600">{fieldErrors.confirmPassword}</p>
@@ -188,7 +188,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
         {/* Сообщение о результате */}
         {submitMessage && (
           <div className={`p-4 rounded-md ${
-            submitMessage.includes('успешно') 
+            submitMessage.includes('successful') 
               ? 'bg-green-100 text-green-800' 
               : 'bg-red-100 text-red-800'
           }`}>
@@ -203,7 +203,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
             disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Регистрация...' : 'Зарегистрироваться'}
+            {isSubmitting ? 'Registration...' : 'Register'}
           </button>
           
           {onSwitchToLogin && (
@@ -212,7 +212,7 @@ export default function RegistrationForm({ onSuccess, onSwitchToLogin }: Registr
               onClick={onSwitchToLogin}
               className="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
-              Уже есть аккаунт? Войти
+              Already have an account? Login
             </button>
           )}
         </div>

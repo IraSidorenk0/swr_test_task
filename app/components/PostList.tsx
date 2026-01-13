@@ -1,195 +1,172 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase/firebase';
-import { Post, PostFormData } from '../types';
-import PostForm from './PostForm';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchPosts, updatePost, deletePost, toggleLike, fetchLikedStates, optimisticToggleLike, revertOptimisticLike } from '../../store/slices/postsSlice';
-import AuthModal from './AuthModal';
-import PostFilters from './PostFilters';
-import PostCard from './PostCard';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorMessage from './ErrorMessage';
-import EmptyState from './EmptyState';
+import { useState, useMemo } from 'react';
+import { Timestamp } from 'firebase/firestore';
 import ConfirmDialog from './ConfirmDialog';
+import { AppUser, Post, PostFormData } from '../types';
+import PostForm from './PostForm';
+import PostCard from './PostCard';
+import { PostFilters } from './PostFilters';
+import { usePosts } from '../../hooks/usePosts';
+import { useLikedPosts } from '../../hooks/useLikedPosts';
 
+export default function PostList({ currentUser, posts}: { 
+  currentUser: AppUser | null,
+  posts: Post[]
+}) {
+  // Filters
+  const [authorFilter, setAuthorFilter] = useState<string>('');
+  const [tagFilter, setTagFilter] = useState<string>('');
 
-export default function PostList() {
-  const dispatch = useAppDispatch();
-  const { posts, likedPostIds, loading, error } = useAppSelector((state) => state.posts);
-  
+  // Use the usePosts hook
+  const { 
+    createPost,
+    updatePost,
+    deletePost,
+    toggleLike
+  } = usePosts({ 
+    author: authorFilter, 
+    tag: tagFilter 
+  });
+
+  // Use the useLikedPosts hook for tracking liked posts
+  const { likedPostIds, toggleLike: toggleLikeLocal } = useLikedPosts(currentUser?.uid);
+
   const [showPostForm, setShowPostForm] = useState(false);
+  const [formData, setFormData] = useState<PostFormData>({
+    title: '',
+    content: '',
+    tags: [],
+    likes: 0
+  });
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<PostFormData>({ title: '', content: '', tags: [], likes: 0 });
+  const [editData, setEditData] = useState<Omit<Post, 'id' | 'authorId' | 'authorName' | 'createdAt' | 'updatedAt'>>({ 
+    title: '', 
+    content: '', 
+    tags: [], 
+    likes: 0 
+  });
   const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
-  // Filters
-  const [authorFilter, setAuthorFilter] = useState<string>('');
-  const [tagFilter, setTagFilter] = useState<string>('');
   const [appliedAuthorFilter, setAppliedAuthorFilter] = useState<string>('');
   const [appliedTagFilter, setAppliedTagFilter] = useState<string>('');
-  
+
   // Authentication states
-  const [user, setUser] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [submitMessage, setSubmitMessage] = useState('');
 
+  const filteredPosts = useMemo(() => {
+    const authorTerm = appliedAuthorFilter.trim().toLowerCase();
+    const tagTerm = appliedTagFilter.trim().toLowerCase();
 
-  // Fetch posts on component mount and when applied filters change
-  useEffect(() => {
-    dispatch(fetchPosts({ authorFilter: appliedAuthorFilter, tagFilter: appliedTagFilter }));
-  }, [dispatch, appliedAuthorFilter, appliedTagFilter]);
+    if (!authorTerm && !tagTerm) {
+      return posts;
+    }
 
-  // Authentication state listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setShowAuthModal(false);
-        setSubmitMessage('');
-        // Refresh liked states when user logs in
-        if (posts.length > 0) {
-          dispatch(fetchLikedStates({ posts, userId: currentUser.uid }));
-        }
-      }
+    return posts.filter((post) => {
+      const matchesAuthor = authorTerm
+        ? (post.authorName || '').toLowerCase().startsWith(authorTerm)
+        : true;
+
+      const matchesTag = tagTerm
+        ? (post.tags || []).some((t) => (t || '').toLowerCase().startsWith(tagTerm))
+        : true;
+
+      return matchesAuthor && matchesTag;
     });
+  }, [posts, appliedAuthorFilter, appliedTagFilter]);
 
-    return () => unsubscribe();
-  }, [dispatch, posts]);
-
-  // Handle post creation success
   const handlePostCreated = () => {
-    console.log('🎉 Post creation successful! Refreshing posts list...');
     setShowPostForm(false);
-    // Posts will be automatically updated via Redux state
-  };
-
-
-  const beginEditPost = (post: Post) => {
-    if (!user) return;
-    if (post.authorId !== user.uid) return;
-    setEditingPostId(post.id);
-    setEditData({
-      title: post.title,
-      content: post.content,
-      tags: Array.isArray(post.tags) ? post.tags : [],
-      likes: typeof post.likes === 'number' ? post.likes : 0
-    });
-    setEditErrors({});
   };
 
   const cancelEditPost = () => {
     setEditingPostId(null);
     setEditErrors({});
     setIsEditing(false);
+    setEditData({ title: '', content: '', tags: [], likes: 0 });
   };
 
-  const submitEditPost = async (postId: string) => {
-    if (!user) return;
-    setIsEditing(true);
-    setEditErrors({});
+  const handleSubmitEdit = async (post: Post) => {
+    if (!editingPostId) return;
+    
     try {
-      const cleanedTags = (editData.tags || []).map(t => (t ?? '').trim()).filter(t => t.length > 0);
-      if (!editData.title || editData.title.trim().length < 5) {
-        setEditErrors(prev => ({ ...prev, title: 'Минимум 5 символов' }));
-        setIsEditing(false);
-        return;
-      }
-      if (!editData.content || editData.content.trim().length < 10) {
-        setEditErrors(prev => ({ ...prev, content: 'Минимум 10 символов' }));
-        setIsEditing(false);
-        return;
-      }
-      if (cleanedTags.length === 0) {
-        setEditErrors(prev => ({ ...prev, tags: 'Добавьте хотя бы один тег' }));
-        setIsEditing(false);
-        return;
-      }
-
-      const updates = {
-        title: editData.title.trim(),
-        content: editData.content.trim(),
-        tags: cleanedTags,
-        likes: Math.max(0, Number(editData.likes || 0)),
-      };
-
-      await dispatch(updatePost({ postId, updates })).unwrap();
+      await updatePost(editingPostId, {
+        title: editData.title,
+        content: editData.content,
+        tags: editData.tags
+      });
+      
+      setShowPostForm(false);
       setEditingPostId(null);
-    } catch (e) {
-      console.error('Error updating post:', e);
-    } finally {
       setIsEditing(false);
+      setEditData({ title: '', content: '', tags: [], likes: 0 });
+      
+    } catch (error) {
+      console.error('Error updating post:', error);
     }
   };
 
   const handleDeletePost = (post: Post) => {
-    if (!user) return;
-    if (post.authorId !== user.uid) return;
+    if (!currentUser) return;
+    if (post.authorId !== currentUser.uid) return;
     setPostToDelete(post);
     setConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!postToDelete) return;
+    
     try {
-      await dispatch(deletePost(postToDelete.id)).unwrap();
-      if (editingPostId === postToDelete.id) cancelEditPost();
-    } catch (e) {
-      console.error('Error deleting post:', e);
-    } finally {
+      await deletePost(postToDelete.id);
       setConfirmOpen(false);
       setPostToDelete(null);
+    } catch (error) {
+      console.error('Error deleting post:', error);
     }
   };
 
-  const cancelDelete = () => {
-    setConfirmOpen(false);
-    setPostToDelete(null);
-  };
-
-  const handleToggleLike = async (post: Post) => {
-    if (!user) {
-      setAuthMode('login');
-      setShowAuthModal(true);
-      return;
-    }
-    const userId = user.uid;
-    const isLiked = likedPostIds.includes(post.id);
-    const increment = isLiked ? -1 : 1;
-    
-    // Optimistic update
-    dispatch(optimisticToggleLike({ postId: post.id, increment, isLiked: !isLiked }));
+  const handleLike = async (postId: string) => {
+    if (!currentUser) return;
     
     try {
-      await dispatch(toggleLike({ postId: post.id, userId, isLiked })).unwrap();
-    } catch (e) {
-      console.error('Error toggling like:', e);
-      // Revert optimistic update on failure
-      dispatch(revertOptimisticLike({ postId: post.id, increment, isLiked: !isLiked }));
+      const isLiked = likedPostIds.includes(postId);
+      
+      // Optimistic local update
+      toggleLikeLocal(postId);
+      
+      // Update in Firestore
+      await toggleLike(postId, currentUser.uid, isLiked);
+      
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      // Revert local state on error
+      toggleLikeLocal(postId);
     }
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: Timestamp | string | Date | null | undefined) => {
     if (!timestamp) return 'Дата неизвестна';
     
     try {
+      let date: Date;
+      
       // Handle Firebase Timestamp
-      if (timestamp.toDate) {
-        return timestamp.toDate().toLocaleDateString('ru-RU', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+      if (timestamp instanceof Timestamp) {
+        date = timestamp.toDate();
+      } 
+      // Handle string or Date
+      else {
+        date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
       }
-      // Handle regular Date
-      return new Date(timestamp).toLocaleDateString('ru-RU', {
+      
+      // If we still don't have a valid date, return unknown
+      if (isNaN(date.getTime())) {
+        return 'Date unknown';
+      }
+      
+      return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -197,91 +174,37 @@ export default function PostList() {
         minute: '2-digit'
       });
     } catch (error) {
-      return 'Дата неизвестна';
+      console.error('Error formatting date:', error);
+      return 'Date unknown';
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner message="Загрузка постов..." size="lg" />;
-  }
-
-  if (error) {
-    return (
-      <ErrorMessage
-        message={`Не удалось загрузить посты: ${error}`}
-        showTroubleshooting={true}
-        onRetry={() => window.location.reload()}
-        onRefresh={() => dispatch(fetchPosts({ authorFilter: appliedAuthorFilter, tagFilter: appliedTagFilter }))}
-      />
-    );
-  }
-  const loginToSite = () => {
-    setAuthMode('login');
-    setShowAuthModal(true);
-  }
-
-  const registerToSite = () => {
-    setAuthMode('register');
-    setShowAuthModal(true);
-  }
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setSubmitMessage('Вы вышли из системы');
-    } catch (error) {
-      console.error('Ошибка при выходе:', error);
-    }
+  const cancelDelete = (): void => {
+    setConfirmOpen(false);
+    setPostToDelete(null);
   };
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-        <h2 className="text-responsive-lg font-bold text-gray-900">Последние посты</h2>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {user ? (
-            <>
-              <span className="text-gray-600 mr-2">
-                Привет, {user.displayName || user.email}!
-              </span>
-              <button
-                onClick={() => setShowPostForm(!showPostForm)}
-                className="btn btn-primary w-full sm:w-auto"
-              >
-                {showPostForm ? '📝 Скрыть форму' : '✍️ Создать пост'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={loginToSite}
-                className="btn btn-primary w-full sm:w-auto"
-              >
-                🔐 Войти
-              </button>
-              <button
-                onClick={registerToSite}
-                className="btn btn-success w-full sm:w-auto"
-              >
-                📝 Регистрация
-              </button>
-            </>
-          )}
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Posts</h1>
+        <button
+          onClick={() => currentUser ? setShowPostForm(true) : setShowAuthModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          {currentUser ? 'Create Post' : 'Sign In to Post'}
+        </button>
       </div>
-
-      {/* Filters */}
       <PostFilters
         authorFilter={authorFilter}
         tagFilter={tagFilter}
-        appliedAuthorFilter={appliedAuthorFilter}
-        appliedTagFilter={appliedTagFilter}
         onAuthorFilterChange={setAuthorFilter}
         onTagFilterChange={setTagFilter}
-        onApplyFilters={() => {
-          setAppliedAuthorFilter(authorFilter.trim());
-          setAppliedTagFilter(tagFilter.trim());
+        onApplyFilters={(author, tag) => {
+          setAuthorFilter(author);
+          setTagFilter(tag);
+          setAppliedAuthorFilter(author);
+          setAppliedTagFilter(tag);
         }}
         onResetFilters={() => {
           setAuthorFilter('');
@@ -290,72 +213,80 @@ export default function PostList() {
           setAppliedTagFilter('');
         }}
       />
-
-      {/* Post Form */}
-      {showPostForm && (
+      {showPostForm ? (
         <div className="mb-8">
-          <PostForm onSuccess={handlePostCreated} />
-        </div>
-      )}
-
-      {/* Auth Modal */}
-      <AuthModal
-        isVisible={showAuthModal}
-        initialMode={authMode}
-        onClose={() => setShowAuthModal(false)}
-      />
-
-      {/* Posts List */}
-      <div className="space-y-8">
-        {!posts || posts.length === 0 ? (
-          <EmptyState
-            title="Пока нет постов"
-            description="Создайте первый пост, чтобы начать!"
-            actionLabel={user ? "✍️ Создать первый пост" : undefined}
-            onAction={user ? () => setShowPostForm(true) : undefined}
+          <PostForm 
+            currentUser={currentUser}
+            formData={formData}
+            setFormData={setFormData}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!currentUser) return;
+              
+              try {
+                await createPost({
+                  title: formData.title,
+                  content: formData.content,
+                  tags: formData.tags,
+                  authorId: currentUser.uid,
+                  authorName: currentUser.displayName || currentUser.email || 'Anonymous'
+                });
+                
+                // Reset form
+                setFormData({
+                  title: '',
+                  content: '',
+                  tags: [],
+                  likes: 0
+                });
+                
+                // Close the form
+                setShowPostForm(false);
+                
+                // Call success handler
+                handlePostCreated();
+              } catch (error) {
+                console.error('Error creating post:', error);
+              }
+            }}
+            onCancel={() => setShowPostForm(false)}
+            errors={{}}
+            onSuccess={handlePostCreated}
           />
-        ) : (
+        </div>
+      ) : (
+        <div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {posts.map((post) => (
+            {filteredPosts.map((post: Post) => (
               <PostCard
                 key={post.id}
                 post={post}
-                user={user}
-                likedPostIds={likedPostIds}
                 editingPostId={editingPostId}
                 editData={editData}
                 editErrors={editErrors}
-                isEditing={isEditing}
-                onToggleLike={handleToggleLike}
-                onBeginEdit={beginEditPost}
+                isEditing={editingPostId === post.id}
+                onToggleLike={(post) => handleLike(post.id)}
                 onCancelEdit={cancelEditPost}
-                onSubmitEdit={submitEditPost}
+                onSubmitEdit={handleSubmitEdit}
                 onDelete={handleDeletePost}
                 onEditDataChange={(data) => setEditData(prev => ({ ...prev, ...data }))}
-                onAuthorFilter={(authorName) => {
-                  setAuthorFilter(authorName);
-                  setAppliedAuthorFilter(authorName);
-                }}
-                onTagFilter={(tag) => {
-                  setTagFilter(tag);
-                  setAppliedTagFilter(tag);
-                }}
                 formatDate={formatDate}
-              />
+                isLiked={likedPostIds.includes(post.id)}
+                isOwnPost={!!currentUser && post.authorId === currentUser.uid}
+              />  
             ))}
           </div>
-        )}
-      </div>
-
-      <ConfirmDialog
-        isOpen={confirmOpen}
-        title="Удалить этот пост?"
-        description="Это действие необратимо."
-        confirmText="Удалить"
-        cancelText="Отмена"
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
-      />
+          <ConfirmDialog
+            isOpen={confirmOpen}
+            title="Delete this post?"
+            description="This action is irreversible."
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={confirmDelete}
+            onCancel={cancelDelete}
+          />  
+        </div>
+      )}
     </div>
   );
 }

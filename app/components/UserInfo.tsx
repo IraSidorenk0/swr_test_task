@@ -12,7 +12,7 @@ export default function UserInfo({ user }: UserInfoProps) {
   return (
     <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
       <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-        👤 Информация об авторе
+        👤 Author info
       </h3>
       <div className="flex items-center space-x-3">
         <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">

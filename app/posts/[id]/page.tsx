@@ -1,27 +1,29 @@
-'use client';
+import { notFound } from 'next/navigation';
+import PostDetailClient from '../../components/PostDetailClient';
+import { getCurrentUser } from '@/firebase/auth';
+import { fetchPostById } from '@/store/slices/postsActions';
 
-import { useParams } from 'next/navigation';
-import PostDetail from '../../components/PostDetail';
+type Props = {
+  params: Promise<{
+    id: string;
+  }>;
+};
 
-export default function PostPage() {
-  const params = useParams();
-  const postId = params.id as string;
+export default async function PostPage({ params }: Props) {
+  // In Next.js app router, params is a Promise and must be awaited
+  const { id: postId } = await params;
 
+  const currentUser = await getCurrentUser();
   if (!postId) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Ошибка</h2>
-          <p className="text-gray-600">ID поста не найден</p>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <PostDetail postId={postId} />
-    </div>
-  );
-}
+  // Fetch post directly from Firestore
+  const currentPost  = await fetchPostById(postId);
 
+  if (!currentPost) {
+    notFound();
+  }
+
+  return <PostDetailClient postId={postId} currentUser={currentUser} currentPost={currentPost} />;
+}
