@@ -6,7 +6,6 @@ import { db } from '../../../../firebase/firebase';
 import { Post, SerializedPost } from '../../../types';
 import { getCurrentUser } from '@/firebase/auth';
 import EditPostClient from './EditPostClient';
-import { AppUser } from '../../../types';
 import { fetchPostById } from '@/store/slices/postsActions';
 
 type Props = {
