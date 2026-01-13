@@ -1,7 +1,7 @@
 // auth.config.ts
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { getFirebaseAdmin } from '@/firebase/firebase-admin';
+import { initializeFirebaseAdmin } from '@/firebase/firebase-admin';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,7 +18,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const admin = getFirebaseAdmin();
+          const admin = initializeFirebaseAdmin();
           const { getAuth } = await import('firebase-admin/auth');
           
           // Sign in with email/password using Firebase Admin SDK
