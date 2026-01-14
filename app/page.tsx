@@ -1,6 +1,6 @@
 'use server';
 import PostList from './components/PostList';
-import { getPosts } from '../store/slices/postsActions';
+import { getPosts } from '../store/actions/postsActions';
 import { getCurrentUser } from '../firebase/auth';
 
 export default async function Home() {

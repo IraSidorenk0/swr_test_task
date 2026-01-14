@@ -1,7 +1,6 @@
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import type { Comment } from '../../app/types';
-import type { CommentsData } from '../../app/types/comments-data';
 
 // Plain async helper for fetching comments for a specific post (usable in server components or SWR)
 export async function fetchCommentsForPost(postId: string): Promise<Comment[]> {

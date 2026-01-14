@@ -62,8 +62,6 @@ export interface RegistrationFormData {
   displayName: string;
 }
 
-import { Timestamp } from 'firebase/firestore';
-
 export interface Comment {
   id: string;
   postId: string;

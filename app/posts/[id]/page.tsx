@@ -1,7 +1,9 @@
+
+'use server';
 import { notFound } from 'next/navigation';
 import PostDetailClient from '../../components/PostDetailClient';
 import { getCurrentUser } from '@/firebase/auth';
-import { fetchPostById } from '@/store/slices/postsActions';
+import { fetchPostById } from '@/store/actions/postsActions';
 
 type Props = {
   params: Promise<{

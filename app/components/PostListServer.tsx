@@ -1,15 +1,15 @@
-import { Post } from '../../types/post';
+import { Post } from '../types';
 import PostsClient from './PostsClient';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../app/config/auth';
 
 interface PostListServerProps {
-  initialPosts: Post[];
+  posts: Post[];
   initialLikedPostIds: string[];
 }
 
 export default async function PostListServer({
-  initialPosts,
+  posts,
   initialLikedPostIds,
 }: PostListServerProps) {
   // Get the current user's session on the server
@@ -25,7 +25,7 @@ export default async function PostListServer({
 
   return (
     <PostsClient
-      initialPosts={initialPosts}
+      posts={posts}
       initialLikedPostIds={initialLikedPostIds}
       initialUser={currentUser}
     />

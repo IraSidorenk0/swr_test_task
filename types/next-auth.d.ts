@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import NextAuth from 'next-auth';
-=======
 import 'next-auth';
->>>>>>> feature/ServerMethods
 
 declare module 'next-auth' {
   interface Session {
@@ -14,12 +10,9 @@ declare module 'next-auth' {
     };
   }
 }
-<<<<<<< HEAD
-=======
 
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
   }
 }
->>>>>>> feature/ServerMethods
