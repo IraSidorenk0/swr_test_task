@@ -19,7 +19,7 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
   const [post, setPost] = useState<Post | null>(currentPost);
   const [loading, setLoading] = useState(!currentPost);
   const [liking, setLiking] = useState(false);
-  const { likedPostIds, toggleLike } = useLikedPosts(currentUser?.uid);
+  const { likedPostIds, toggleLike, isLoading, error } = useLikedPosts(currentUser?.uid);
   const isLiked = post ? likedPostIds.includes(post.id) : false;
   const [showLoginNotice, setShowLoginNotice] = useState(false);
 

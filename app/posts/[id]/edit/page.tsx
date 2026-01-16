@@ -37,7 +37,6 @@ export default async function EditPostPage({ params }: Props) {
   }
   
  const postDoc = await getDoc(doc(db, 'posts', postId));
- console.log(postDoc);
   if (!postDoc.exists()) {
     notFound();
   }

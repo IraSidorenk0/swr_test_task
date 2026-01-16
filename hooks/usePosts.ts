@@ -1,5 +1,5 @@
 import useSWR, { mutate } from 'swr';
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, increment, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import type { Post } from '../app/types';
 
@@ -133,38 +133,6 @@ export const usePosts = (filters?: { author?: string; tag?: string }) => {
     }
   };
 
-  const toggleLike = async (postId: string, userId: string, isLiked: boolean) => {
-    try {
-      const postRef = doc(db, 'posts', postId);
-      const likeRef = doc(db, 'likes', `${userId}_${postId}`);
-      
-      if (isLiked) {
-        // Remove like
-        await deleteDoc(likeRef);
-        await updateDoc(postRef, {
-          likes: increment(-1)
-        });
-      } else {
-        // Add like
-        await setDoc(likeRef, {
-          userId,
-          postId,
-          createdAt: serverTimestamp()
-        });
-        await updateDoc(postRef, {
-          likes: increment(1)
-        });
-      }
-      
-      // Revalidate
-      mutatePosts();
-      return true;
-    } catch (error) {
-      console.error('Error toggling like:', error);
-      throw error;
-    }
-  };
-
   return {
     posts: posts || [],
     isLoading,
@@ -172,7 +140,6 @@ export const usePosts = (filters?: { author?: string; tag?: string }) => {
     createPost,
     updatePost,
     deletePost,
-    toggleLike,
     mutate: mutatePosts,
   };
 };

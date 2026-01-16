@@ -18,18 +18,17 @@ export default function PostList({ currentUser, posts}: {
   const [authorFilter, setAuthorFilter] = useState<string>('');
   const [tagFilter, setTagFilter] = useState<string>('');
 
-  // Use the usePosts hook
+  // Use the usePosts hook for posts CRUD
   const { 
     createPost,
     updatePost,
     deletePost,
-    toggleLike
   } = usePosts({ 
     author: authorFilter, 
     tag: tagFilter 
   });
 
-  // Use the useLikedPosts hook for tracking liked posts
+  // Use the useLikedPosts hook for tracking liked posts and toggling like state
   const { likedPostIds, toggleLike: toggleLikeLocal } = useLikedPosts(currentUser?.uid);
 
   const [showPostForm, setShowPostForm] = useState(false);
@@ -129,20 +128,12 @@ export default function PostList({ currentUser, posts}: {
 
   const handleLike = async (postId: string) => {
     if (!currentUser) return;
-    
+
     try {
-      const isLiked = likedPostIds.includes(postId);
-      
-      // Optimistic local update
-      toggleLikeLocal(postId);
-      
-      // Update in Firestore
-      await toggleLike(postId, currentUser.uid, isLiked);
-      
+      // Delegate to useLikedPosts, which handles optimistic update and server call
+      await toggleLikeLocal(postId);
     } catch (error) {
       console.error('Error toggling like:', error);
-      // Revert local state on error
-      toggleLikeLocal(postId);
     }
   };
 

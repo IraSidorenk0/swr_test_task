@@ -9,7 +9,7 @@ interface ErrorMessageProps {
 }
 
 export default function ErrorMessage({ 
-  title = 'Ошибка подключения к Firebase',
+  title = 'Error connecting to Firebase',
   message, 
   onRetry, 
   onRefresh,

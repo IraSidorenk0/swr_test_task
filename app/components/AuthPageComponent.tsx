@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter, redirect } from 'next/navigation';
 import LoginForm from './LoginForm';
 import RegistrationForm from './RegistrationForm';
 import { User } from '../types';
@@ -10,17 +10,10 @@ export default function AuthPageComponent({ currentUser }: { currentUser: User |
   const [isLogin, setIsLogin] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect');
-
-  // Handle redirection in useEffect to avoid render phase updates
-  useEffect(() => {
-    if (currentUser) {
-      setIsRedirecting(true);
-      const redirectTo = redirectUrl || '/';
-      router.push(redirectTo);
-    }
-  }, [currentUser, redirectUrl, router]);
+  if (currentUser) {
+    const redirectTo = "/"; 
+    redirect(redirectTo);
+  }
 
   // Show loading state while redirecting
   if (isRedirecting) {

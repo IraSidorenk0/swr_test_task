@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase/firebase';
+import { useState } from 'react';
 import { Post } from '../types';
-import { useLikedPosts } from '../../store/actions/hooks';
+import { useLikedPosts } from '../../hooks/useLikedPosts';
 
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
@@ -30,19 +28,9 @@ export default function PostsClient({
   // Initialize user state with the server-side user if available
   const [user, setUser] = useState(initialUser);
   const { likedPostIds, isLoading: likesLoading, error: likesError } = useLikedPosts(user?.uid);
-  
-  const [appliedAuthorFilter, setAppliedAuthorFilter] = useState<string>('');
-  const [appliedTagFilter, setAppliedTagFilter] = useState<string>('');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [submitMessage, setSubmitMessage] = useState('');
-
-  // ... (rest of the component logic remains the same as in PostList.tsx)
-  // You'll need to copy over all the handler functions (handlePostCreated, beginEditPost, etc.)
-  // from the original PostList component
 
   if (likesLoading || posts === undefined) {
-    return <LoadingSpinner message="Загрузка постов..." size="lg" />;
+    return <LoadingSpinner message="Loading posts..." size="lg" />;
   }
 
   if (likesError) {
