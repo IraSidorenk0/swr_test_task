@@ -1,6 +1,6 @@
 'use client';
 
-import { useComments } from '../../hooks/useComments';
+import { useComments } from '../../firebase-actions/useComments';
 import { Timestamp } from 'firebase/firestore';
 
 interface CommentListProps {

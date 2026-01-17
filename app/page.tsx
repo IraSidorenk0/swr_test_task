@@ -1,12 +1,12 @@
 'use server';
 import PostList from './components/PostList';
-import { getPosts } from '../store/actions/postsActions';
+import { fetchPosts } from '../store/actions/postsActions';
 import { getCurrentUser } from '../firebase/auth';
 
 export default async function Home() {
   const authorFilter = '';
   const tagFilter = '';
-  const posts = await getPosts(authorFilter, tagFilter);
+  const posts = await fetchPosts({ author: authorFilter, tag: tagFilter });
   const currentUser = await getCurrentUser();
   return (
     <div className="container-responsive py-8">

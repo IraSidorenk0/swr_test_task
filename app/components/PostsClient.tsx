@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Post } from '../types';
-import { useLikedPosts } from '../../hooks/useLikedPosts';
+import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
 
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';

@@ -7,8 +7,8 @@ import { AppUser, Post, PostFormData } from '../types';
 import PostForm from './PostForm';
 import PostCard from './PostCard';
 import { PostFilters } from './PostFilters';
-import { usePosts } from '../../hooks/usePosts';
-import { useLikedPosts } from '../../hooks/useLikedPosts';
+import { usePosts } from '../../firebase-actions/usePosts';
+import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
 
 export default function PostList({ currentUser, posts}: { 
   currentUser: AppUser | null,

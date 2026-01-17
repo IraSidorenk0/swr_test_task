@@ -1,6 +1,64 @@
-import { collection, query, orderBy, getDocs, doc, getDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, getDoc, where, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { Post } from '../../app/types';
+
+export async function fetchPosts(filters?: { author?: string; tag?: string }): Promise<Post[]> {
+  const baseConstraints: any[] = [];
+
+  if (filters?.author?.trim()) {
+    baseConstraints.push(where('authorName', '==', filters.author.trim()));
+  }
+  if (filters?.tag?.trim()) {
+    baseConstraints.push(where('tags', 'array-contains', filters.tag.trim()));
+  }
+
+  let querySnapshot;
+  try {
+    const withOrder = query(collection(db, 'posts'), ...baseConstraints, orderBy('createdAt', 'desc'));
+    querySnapshot = await getDocs(withOrder);
+  } catch (e: any) {
+    const message = (e && e.message) || '';
+    if (message.includes('index') || message.includes('FAILED_PRECONDITION')) {
+      console.warn('⚠️ Missing index, retrying without orderBy and sorting client-side');
+      const withoutOrder = query(collection(db, 'posts'), ...baseConstraints);
+      querySnapshot = await getDocs(withoutOrder);
+    } else {
+      throw e;
+    }
+  }
+
+  const posts = querySnapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as any;
+    return {
+      id: docSnap.id,
+      ...data,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      likes: typeof data.likes === 'number' ? data.likes : 0,
+      createdAt:
+        data.createdAt instanceof Timestamp
+          ? data.createdAt.toDate().toISOString()
+          : new Date(data.createdAt).toISOString(),
+      updatedAt:
+        data.updatedAt instanceof Timestamp
+          ? data.updatedAt.toDate().toISOString()
+          : new Date(data.updatedAt).toISOString(),
+    } as Post;
+  });
+
+  const getDateValue = (date: string | Timestamp | Date): number => {
+    if (date instanceof Timestamp) {
+      return date.toMillis();
+    }
+    return new Date(date).getTime();
+  };
+
+  const queryOrderBy = (querySnapshot.query as any).orderBy;
+  if (!queryOrderBy || queryOrderBy.length === 0) {
+    return posts.sort((a, b) => getDateValue(b.createdAt) - getDateValue(a.createdAt));
+  }
+
+  return posts;
+}
 
 // Plain async helper for fetching a single post by ID (usable in server components or SWR)
 export async function fetchPostById(postId: string): Promise<Post | null> {
@@ -32,45 +90,5 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     console.error('Error fetching post:', error);
     return null;
   }
-}
-
-export async function getPosts(authorFilter?: string, tagFilter?: string): Promise<Post[]> {
-  const baseConstraints: any[] = [];
-
-  if (authorFilter?.trim()) {
-    baseConstraints.push(where('authorName', '==', authorFilter.trim()));
-  }
-  if (tagFilter?.trim()) {
-    baseConstraints.push(where('tags', 'array-contains', tagFilter.trim()));
-  }
-
-  let querySnapshot;
-  try {
-    const withOrder = query(collection(db, 'posts'), ...baseConstraints, orderBy('createdAt', 'desc'));
-    querySnapshot = await getDocs(withOrder);
-  } catch (e: any) {
-    const message = (e && e.message) || '';
-    if (message.includes('index') || message.includes('FAILED_PRECONDITION')) {
-      console.warn('⚠️ Missing index, retrying without orderBy and sorting client-side');
-      const withoutOrder = query(collection(db, 'posts'), ...baseConstraints);
-      querySnapshot = await getDocs(withoutOrder);
-    } else {
-      throw e;
-    }
-  }
-
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      title: data?.title || '',
-      content: data?.content || '',
-      tags: Array.isArray(data?.tags) ? data.tags : [],
-      likes: typeof data?.likes === 'number' ? data.likes : 0,
-      authorId: data?.authorId || '',
-      authorName: data?.authorName || '',
-      createdAt: data?.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data?.createdAt || new Date().toISOString(),
-    } as Post;
-  });
 }
 

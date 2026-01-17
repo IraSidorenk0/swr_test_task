@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Post, PostFormData, AppUser } from '../types';
 import PostForm from './PostForm';
 import { Timestamp } from 'firebase/firestore';
-import { usePosts } from '../../hooks/usePosts';
+import { usePosts } from '../../firebase-actions/usePosts';
 
 type EditPostFormProps = {
   postId: string;

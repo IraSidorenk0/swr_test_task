@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { Post } from '../types';
 import InlineNotice from './InlineNotice';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
-import { useLikedPosts } from '../../hooks/useLikedPosts';
+import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
 import { User as AppUserWithoutEmailVerified } from '../types';
 
 interface PostDetailProps {
@@ -16,29 +16,21 @@ interface PostDetailProps {
 }
 
 export default function PostDetail({ postId, currentUser, currentPost }: PostDetailProps) {
-  const [post, setPost] = useState<Post | null>(currentPost);
   const [loading, setLoading] = useState(!currentPost);
   const [liking, setLiking] = useState(false);
   const { likedPostIds, toggleLike, isLoading, error } = useLikedPosts(currentUser?.uid);
-  const isLiked = post ? likedPostIds.includes(post.id) : false;
+  const isLiked = currentPost ? likedPostIds.includes(currentPost.id) : false;
   const [showLoginNotice, setShowLoginNotice] = useState(false);
-
-  useEffect(() => {
-    if (currentPost) {
-      setPost(currentPost);
-      setLoading(false);
-    }
-  }, [currentPost]);
 
   const handleLike = async () => {
     if (!currentUser) {
       setShowLoginNotice(true);
       return;
     }
-    if (!post) return;
+    if (!currentPost) return;
     
     try {
-      await toggleLike(post.id);
+      await toggleLike(currentPost.id);
     } catch (error) {
       console.error('Error toggling like:', error);
     }
@@ -85,7 +77,7 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
     );
   }
 
-  if (!post) {
+  if (!currentPost) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -115,16 +107,16 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
       <article className="card p-8 mb-12 animate-slide-in">
         {/* Post Header */}
         <header className="mb-8">
-          <h1 className="text-responsive-xl font-bold text-gray-900 mb-6 leading-tight">{post?.title}</h1>
+          <h1 className="text-responsive-xl font-bold text-gray-900 mb-6 leading-tight">{currentPost?.title}</h1>
           
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold mr-3">
-                  {post?.authorName.charAt(0).toUpperCase()}
+                  {currentPost?.authorName.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex flex-col">
-                  <p className="font-medium text-gray-900">{post?.authorName}</p>
+                  <p className="font-medium text-gray-900">{currentPost?.authorName}</p>
                   <p className="text-xs text-gray-500">Author</p>
                 </div>
               </div>
@@ -133,14 +125,14 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                 </svg>
-                <span>{formatDate(post?.createdAt as Timestamp)}</span>
+                <span>{formatDate(currentPost?.createdAt as Timestamp)}</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
                 </svg>
-                <span>{post?.likes} likes</span>
+                <span>{currentPost?.likes} likes</span>
               </div>
             </div>
             
@@ -174,18 +166,18 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
             </div>
           )}
           <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-responsive-base">
-            {post?.content}
+            {currentPost?.content}
           </div>
         </div>
 
         {/* Tags */}
-        {post?.tags && post.tags.length > 0 && (
+        {currentPost?.tags && currentPost.tags.length > 0 && (
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
               🏷️ Tags
             </h3>
             <div className="flex flex-wrap gap-2">
-              {post?.tags.map((tag, index) => (
+              {currentPost?.tags.map((tag, index) => (
                 <span
                   key={index}
                   className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 text-sm font-medium px-4 py-2 rounded-full border border-blue-200 hover:shadow-sm transition-shadow"

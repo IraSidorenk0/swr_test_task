@@ -1,7 +1,5 @@
 import useSWR from 'swr';
 
-const LIKES_KEY = 'likes';
-
 // Fetcher for SWR
 const fetcher = async ([url, userId]: [string, string]) => {
   const res = await fetch(`${url}?userId=${encodeURIComponent(userId)}`);

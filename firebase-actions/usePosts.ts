@@ -1,63 +1,37 @@
+'use client';
+
 import useSWR, { mutate } from 'swr';
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import type { Post } from '../app/types';
 
 const POSTS_KEY = 'posts';
 
-// Fetcher function for SWR
-const fetchPosts = async (filters?: { author?: string; tag?: string }): Promise<Post[]> => {
-  const baseConstraints: any[] = [];
-  
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error('Failed to fetch posts');
+  }
+  return res.json();
+};
+
+// Fetcher function for SWR that uses the Next.js API route
+export const fetchPosts = async (filters?: { author?: string; tag?: string }): Promise<Post[]> => {
+  const params = new URLSearchParams();
+
   if (filters?.author?.trim()) {
-    baseConstraints.push(where('authorName', '==', filters.author.trim()));
+    params.set('author', filters.author.trim());
   }
   if (filters?.tag?.trim()) {
-    baseConstraints.push(where('tags', 'array-contains', filters.tag.trim()));
+    params.set('tag', filters.tag.trim());
   }
 
-  let querySnapshot;
-  try {
-    const withOrder = query(collection(db, 'posts'), ...baseConstraints, orderBy('createdAt', 'desc'));
-    querySnapshot = await getDocs(withOrder);
-  } catch (e: any) {
-    // If an index is required, retry without orderBy and sort client-side
-    const message = (e && e.message) || '';
-    if (message.includes('index') || message.includes('FAILED_PRECONDITION')) {
-      console.warn('⚠️ Missing index, retrying without orderBy and sorting client-side');
-      const withoutOrder = query(collection(db, 'posts'), ...baseConstraints);
-      querySnapshot = await getDocs(withoutOrder);
-    } else {
-      throw e;
-    }
-  } 
-  
-  const posts = querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      tags: Array.isArray(data.tags) ? data.tags : [],
-      likes: typeof data.likes === 'number' ? data.likes : 0,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
-    } as unknown as Post;
-  });
-  const getDateValue = (date: string | Timestamp | Date): number => {
-    if (date instanceof Timestamp) {
-      return date.toMillis();
-    }
-    return new Date(date).getTime();
-  };
-  
-  // If we had to sort client-side, do it now
-  const queryOrderBy = (querySnapshot.query as any).orderBy;
-  if (!queryOrderBy || queryOrderBy.length === 0) {
-    return posts.sort((a, b) => 
-      getDateValue(b.createdAt) - getDateValue(a.createdAt)
-    );
-  }
-  
+  const queryString = params.toString();
+  const url = queryString ? `/api/posts?${queryString}` : '/api/posts';
+
+  const data = await fetcher(url);
+
+  const posts = (data.posts || []) as Post[];
   return posts;
 };
 
@@ -146,4 +120,12 @@ export const usePosts = (filters?: { author?: string; tag?: string }) => {
 
 export const mutatePosts = () => {
   return mutate(POSTS_KEY);
+};
+
+export const getPostById = async (postId: string) => {
+ const { data, mutate, isLoading, error } = useSWR(
+    postId ? ['/api/posts', postId] : null,
+    fetcher
+  );
+  return data;
 };

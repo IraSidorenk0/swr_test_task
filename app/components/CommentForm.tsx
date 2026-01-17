@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../../firebase/firebase';
+
 import { AppUserWithoutEmailVerified } from '../types/index';
-import { useComments } from '../../hooks/useComments';
+import { useComments } from '../../firebase-actions/useComments';
 
 // Zod schema for comment validation
 const commentSchema = z.object({
@@ -31,8 +30,6 @@ export default function CommentForm({ postId, onSuccess, currentUser }: CommentF
     content: ''
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
-
-  const loading = status === 'loading';
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
