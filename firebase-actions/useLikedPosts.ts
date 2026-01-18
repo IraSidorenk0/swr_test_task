@@ -1,4 +1,4 @@
-import useSWR from 'swr';
+import useSWR, { SWRConfiguration } from 'swr';
 
 // Fetcher for SWR
 const fetcher = async ([url, userId]: [string, string]) => {
@@ -8,10 +8,22 @@ const fetcher = async ([url, userId]: [string, string]) => {
   return data.postIds as string[];
 };
 
-export const useLikedPosts = (userId?: string) => {
-  const { data, mutate, isLoading, error } = useSWR(
+interface UseLikedPostsOptions extends Omit<SWRConfiguration<string[]>, 'fallbackData'> {
+  initialData?: string[];
+  fallbackData?: string[];
+}
+
+export const useLikedPosts = (userId?: string, options: UseLikedPostsOptions = {}) => {
+  const { initialData, fallbackData, ...swrConfig } = options;
+  
+  const { data, mutate, isLoading, error } = useSWR<string[]>(
     userId ? ['/api/likes', userId] : null,
-    fetcher
+    fetcher,
+    {
+      ...swrConfig,
+      fallbackData: initialData || fallbackData,
+      revalidateOnMount: !initialData,
+    }
   );
 
   const likedPostIds = data || [];

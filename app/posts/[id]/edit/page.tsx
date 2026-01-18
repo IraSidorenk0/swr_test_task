@@ -6,7 +6,7 @@ import { db } from '../../../../firebase/firebase';
 import { Post, SerializedPost } from '../../../types';
 import { getCurrentUser } from '@/firebase/auth';
 import EditPostClient from './EditPostClient';
-import { fetchPostById } from '@/store/actions/postsActions';
+import { getPostById } from '@/firebase-actions/usePosts';
 
 type Props = {
   params: {
@@ -29,7 +29,7 @@ export default async function EditPostPage({ params }: Props) {
   }
 
   // Fetch post data on the server
-  const postResult = await fetchPostById(postId);
+  const postResult = await getPostById(postId);
   
   // Handle case where post was not found or there was an error
   if (!postResult) {

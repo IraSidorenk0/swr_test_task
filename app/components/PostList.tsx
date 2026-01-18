@@ -10,9 +10,9 @@ import { PostFilters } from './PostFilters';
 import { usePosts } from '../../firebase-actions/usePosts';
 import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
 
-export default function PostList({ currentUser, posts}: { 
+export default function PostList({ currentUser, initialPosts }: { 
   currentUser: AppUser | null,
-  posts: Post[]
+  initialPosts: Post[]
 }) {
   // Filters
   const [authorFilter, setAuthorFilter] = useState<string>('');
@@ -20,16 +20,23 @@ export default function PostList({ currentUser, posts}: {
 
   // Use the usePosts hook for posts CRUD
   const { 
+    posts = [],
     createPost,
     updatePost,
     deletePost,
   } = usePosts({ 
-    author: authorFilter, 
-    tag: tagFilter 
+    filters: {
+      author: authorFilter, 
+      tag: tagFilter,
+    },
+    initialData: initialPosts
   });
 
   // Use the useLikedPosts hook for tracking liked posts and toggling like state
-  const { likedPostIds, toggleLike: toggleLikeLocal } = useLikedPosts(currentUser?.uid);
+  const { likedPostIds, toggleLike: toggleLikeLocal } = useLikedPosts(currentUser?.uid, {
+    // You can pass initialData here if you have server-side liked posts
+    // initialData: serverSideLikedPostIds
+  });
 
   const [showPostForm, setShowPostForm] = useState(false);
   const [formData, setFormData] = useState<PostFormData>({

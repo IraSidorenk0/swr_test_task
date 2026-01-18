@@ -35,10 +35,25 @@ export const fetchPosts = async (filters?: { author?: string; tag?: string }): P
   return posts;
 };
 
-export const usePosts = (filters?: { author?: string; tag?: string }) => {
+interface UsePostsOptions {
+  filters?: {
+    author?: string;
+    tag?: string;
+  };
+  initialData?: Post[];
+  fallbackData?: Post[];
+}
+
+export const usePosts = (options: UsePostsOptions = {}) => {
+  const { filters, initialData, fallbackData } = options;
+  
   const { data: posts, error, isLoading, mutate: mutatePosts } = useSWR<Post[]>(
     [POSTS_KEY, filters],
-    () => fetchPosts(filters)
+    () => fetchPosts(filters),
+    {
+      fallbackData: initialData || fallbackData,
+      revalidateOnMount: !initialData, // Don't revalidate on mount if we have initialData
+    }
   );
 
   const createPost = async (postData: Pick<Post, 'title' | 'content' | 'tags' | 'authorId' | 'authorName'>) => {

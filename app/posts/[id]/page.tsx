@@ -2,7 +2,7 @@
 import { notFound } from 'next/navigation';
 import PostDetailClient from '../../components/PostDetailClient';
 import { getCurrentUser } from '@/firebase/auth';
-import { fetchPostById } from '@/store/actions/postsActions';
+import { getPostById } from '@/firebase-actions/usePosts';
 import { getConnectionStatus } from '@/firebase/firebase-admin';
 
 type Props = {
@@ -44,7 +44,7 @@ export default async function PostPage({ params }: Props) {
 
   try {
     // 3. Fetch post data
-    const currentPost = await fetchPostById(postId);
+    const currentPost = await getPostById(postId);
 
     if (!currentPost) {
       notFound();
