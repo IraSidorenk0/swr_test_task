@@ -1,116 +1,96 @@
-import useSWR, { mutate } from 'swr';
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+'use client';
+
+import { useCallback } from 'react';
+import useSWR, { mutate as swrMutate } from 'swr';
+import { 
+  getComments as getCommentsAction, 
+  createComment as createCommentAction, 
+  updateComment as updateCommentAction, 
+  deleteComment as deleteCommentAction 
+} from './server-actions/comments';
 import type { Comment } from '../app/types';
 
-const COMMENTS_KEY = 'comments';
+const COMMENTS_KEY = (postId: string) => ['comments', postId];
 
-// Fetcher function for SWR
-const fetchComments = async (postId: string): Promise<Comment[]> => {
-    
-  try {
-    const commentsQuery = query(
-      collection(db, 'comments'),
-      where('postId', '==', postId)
-    );
-    
-    const querySnapshot = await getDocs(commentsQuery);
-    
-    const comments = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
-    })) as Comment[];
-    
-    return comments;
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    throw error;
-  }
-};
-
-export const useComments = (postId: string) => {
-  const { data: comments, error, isLoading, mutate: mutateComments } = useSWR<Comment[]>(
-    postId ? [COMMENTS_KEY, postId] : null,
-    () => fetchComments(postId!)
+export function useComments(postId: string) {
+  const { data: comments = [], error, isLoading, mutate } = useSWR<Comment[]>(
+    postId ? COMMENTS_KEY(postId) : null,
+    () => getCommentsAction(postId).then(res => res)
   );
 
-  const createComment = async (commentData: Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const newComment = {
-        ...commentData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+  const getComments = useCallback(async (postId: string): Promise<Comment[]> => {
+    return getCommentsAction(postId);
+  }, []);
 
-      const docRef = await addDoc(collection(db, 'comments'), newComment);
-      
+  const createComment = useCallback(async (commentData: Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> => {
+    try {
+      const newCommentId = await createCommentAction(commentData);
+      if (newCommentId) {
+        // Optimistic update
+        await mutate(async (currentComments = []) => {
+          return [...currentComments, { 
+            ...commentData, 
+            id: newCommentId, 
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          } as Comment];
+        }, false);
+        // Revalidate
+        await mutate();
+      }
+      return newCommentId;
+    } catch (err) {
+      console.error('Failed to create comment:', err);
+      return null;
+    }
+  }, [postId, mutate]);
+
+  const updateComment = useCallback(async (commentId: string, updates: Partial<Comment>): Promise<boolean> => {
+    try {
+      const success = await updateCommentAction(commentId, updates);
+      if (success) {
+        // Optimistic update
+        await mutate(async (currentComments = []) => {
+          return currentComments.map(comment => 
+            comment.id === commentId 
+              ? { ...comment, ...updates, updatedAt: new Date().toISOString() } 
+              : comment
+          );
+        }, false);
+        // Revalidate
+        await mutate();
+      }
+      return success;
+    } catch (err) {
+      console.error('Failed to update comment:', err);
+      return false;
+    }
+  }, [postId, mutate]);
+
+  const deleteComment = useCallback(async (commentId: string): Promise<boolean> => {
+    try {
+      await deleteCommentAction(commentId);
       // Optimistic update
-      const optimisticComment: Comment = {
-        ...newComment,
-        id: docRef.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      mutateComments([optimisticComment, ...(comments || [])], false);
-      
+      await mutate(async (currentComments: Comment[] = []) => {
+        return currentComments.filter(comment => comment.id !== commentId);
+      }, false);
       // Revalidate
-      mutateComments();
-      
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating comment:', error);
-      throw error;
+      await mutate();
+      return true;
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      return false;
     }
-  };
-
-  const updateComment = async (commentId: string, updates: Partial<Comment>) => {
-    try {
-      const commentRef = doc(db, 'comments', commentId);
-      await updateDoc(commentRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
-      
-      // Revalidate the comments list
-      mutateComments();
-    } catch (error) {
-      console.error('Error updating comment:', error);
-      throw error;
-    }
-  };
-
-  const deleteComment = async (commentId: string) => {
-    try {
-      // Optimistic update
-      const previousComments = comments || [];
-      const updatedComments = previousComments.filter(comment => comment.id !== commentId);
-      mutateComments(updatedComments, false);
-      
-      await deleteDoc(doc(db, 'comments', commentId));
-      
-      // Revalidate
-      mutateComments();
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      mutateComments(); // Re-fetch on error
-      throw error;
-    }
-  };
+  }, [postId, mutate]);
 
   return {
-    comments: comments || [],
-    isLoading,
-    error,
+    comments,
+    getComments,
     createComment,
     updateComment,
     deleteComment,
-    mutate: mutateComments,
+    isLoading,
+    error,
+    mutate
   };
-};
-
-export const mutateComments = (postId: string) => {
-  return mutate([COMMENTS_KEY, postId]);
-};
+}

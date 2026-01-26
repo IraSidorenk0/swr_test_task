@@ -1,7 +1,6 @@
 'use client';
 
 import { useComments } from '../../firebase-actions/useComments';
-import { Timestamp } from 'firebase/firestore';
 
 interface CommentListProps {
   postId: string;
@@ -10,24 +9,12 @@ interface CommentListProps {
 export default function CommentList({ postId }: CommentListProps) {
   const { comments, isLoading: loading, error, mutate } = useComments(postId);
 
-  const formatDate = (timestamp: Date | string | Timestamp) => {
-    if (!timestamp) return 'Дата неизвестна';
+  const formatDate = (date: Date | string ) => {
+    if (!date) return 'Unknown date';
     
     try {
-      let date: Date;
-      
-      // Handle Firebase Timestamp
-      if (timestamp instanceof Timestamp) {
-        return timestamp.toDate().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      }
-      // Handle regular Date
-      return new Date(timestamp).toLocaleDateString('en-US', {
+      // Convert the input date to a Date object
+      return new Date(date).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

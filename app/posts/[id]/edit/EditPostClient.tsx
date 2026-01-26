@@ -26,7 +26,6 @@ export default function EditPostClient({
   currentUser: AppUser;
   postId: string;
 }) {
-  // Convert string timestamps back to Date objects for the form
   const postWithDates = {
     ...post,
     createdAt: new Date(post.createdAt),

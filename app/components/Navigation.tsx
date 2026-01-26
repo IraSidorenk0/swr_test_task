@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from '../../firebase/firebase';
+import { getAuth } from 'firebase-admin/auth';
+import { initializeFirebaseAdmin } from '../../firebase/firebase-admin';
 import { signOut } from '../../firebase/actions';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -27,8 +27,13 @@ export default function Navigation({ currentUser, commentsCount = 0 }: Navigatio
 
   const handleLogout = async () => {
     try {
-      // Sign out from Firebase client-side
-      await firebaseSignOut(auth);
+      // Initialize Firebase Admin if not already initialized
+      initializeFirebaseAdmin();
+      
+      if (currentUser?.uid) {
+        // Revoke refresh tokens for the user (server-side sign out)
+        await getAuth().revokeRefreshTokens(currentUser.uid);
+      }
       
       // Clear server-side session
       const result = await signOut();

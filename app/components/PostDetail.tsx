@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Timestamp } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 import { Post } from '../types';
 import InlineNotice from './InlineNotice';
 import CommentForm from './CommentForm';
 import CommentList from './CommentList';
-import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
+import { getLikedPostIds, toggleLike } from '../../firebase-actions/useLikedPosts';
 import { User as AppUserWithoutEmailVerified } from '../types';
 
 interface PostDetailProps {
@@ -18,9 +17,24 @@ interface PostDetailProps {
 export default function PostDetail({ postId, currentUser, currentPost }: PostDetailProps) {
   const [loading, setLoading] = useState(!currentPost);
   const [liking, setLiking] = useState(false);
-  const { likedPostIds, toggleLike, isLoading, error } = useLikedPosts(currentUser?.uid);
-  const isLiked = currentPost ? likedPostIds.includes(currentPost.id) : false;
+  const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
   const [showLoginNotice, setShowLoginNotice] = useState(false);
+  const isLiked = currentPost ? likedPostIds.includes(currentPost.id) : false;
+
+  // Load liked posts when component mounts or user changes
+  useEffect(() => {
+    const loadLikedPosts = async () => {
+      if (currentUser?.uid) {
+        try {
+          const ids = await getLikedPostIds(currentUser.uid);
+          setLikedPostIds(ids);
+        } catch (error) {
+          console.error('Error loading liked posts:', error);
+        }
+      }
+    };
+    loadLikedPosts();
+  }, [currentUser?.uid]);
 
   const handleLike = async () => {
     if (!currentUser) {
@@ -30,28 +44,22 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
     if (!currentPost) return;
     
     try {
-      await toggleLike(currentPost.id);
+      setLiking(true);
+      const updatedLikes = await toggleLike(currentUser.uid, currentPost.id);
+      setLikedPostIds(updatedLikes);
     } catch (error) {
       console.error('Error toggling like:', error);
+    } finally {
+      setLiking(false);
     }
   };
 
-  const formatDate = (timestamp: Timestamp | Date | undefined) => {
-    if (!timestamp) return 'Unknown date';
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return 'Unknown date';
     
     try {
-      // Handle Firebase Timestamp
-      if (timestamp instanceof Timestamp) {
-        return timestamp.toDate().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      }
       // Handle regular Date
-      return new Date(timestamp).toLocaleDateString('en-US', {
+      return new Date(date).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -125,7 +133,7 @@ export default function PostDetail({ postId, currentUser, currentPost }: PostDet
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                 </svg>
-                <span>{formatDate(currentPost?.createdAt as Timestamp)}</span>
+                <span>{formatDate(currentPost?.createdAt ? new Date(currentPost.createdAt) : undefined)}</span>
               </div>
               
               <div className="flex items-center gap-1">

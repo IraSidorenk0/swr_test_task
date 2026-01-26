@@ -2,7 +2,6 @@ import { Post } from '../types';
 import PostCard from './PostCard';
 import EmptyState from './EmptyState';
 import { User } from 'firebase/auth';
-import { Timestamp } from 'firebase/firestore';
 
 interface PostsServerProps {
   posts: Post[];
@@ -22,7 +21,7 @@ interface PostsServerProps {
   onEditDataChange: (data: { title?: string; content?: string; tags?: string[] }) => void;
   onAuthorFilter: (authorName: string) => void;
   onTagFilter: (tag: string) => void;
-  formatDate: (timestamp: Timestamp | unknown ) => string;
+  formatDate: (date: Date | unknown ) => string;
 }
 
 export default function PostsServer({

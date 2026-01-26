@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Post, PostFormData, AppUser } from '../types';
 import PostForm from './PostForm';
-import { Timestamp } from 'firebase/firestore';
 import { usePosts } from '../../firebase-actions/usePosts';
+import toast from 'react-hot-toast';
 
 type EditPostFormProps = {
   postId: string;
@@ -20,10 +20,12 @@ export default function EditPostForm({ postId, currentPost, currentUser }: EditP
   const [post, setPost] = useState<Post | null>(currentPost);
   const [loading, setLoading] = useState(!currentPost);
   const [formData, setFormData] = useState<PostFormData>({ 
+    id: postId,
     title: currentPost?.title || '', 
     content: currentPost?.content || '', 
     tags: currentPost?.tags || [], 
-    likes: currentPost?.likes || 0 
+    likes: currentPost?.likes || 0,
+    ...(currentPost?.likedBy && { likedBy: currentPost.likedBy })
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -43,10 +45,11 @@ export default function EditPostForm({ postId, currentPost, currentUser }: EditP
     try {
     const updatedPost = {
       ...formData,
-      updatedAt: Timestamp.now(),
+      updatedAt: new Date(),
       authorId: currentUser.uid,
       authorName: currentUser.displayName || 'Anonymous',
-    } as Omit<Post, 'id' | 'updatedAt'> & { updatedAt: Timestamp };
+      createdAt: currentPost?.createdAt || new Date(),
+    } as Omit<Post, 'id' | 'updatedAt'> & { updatedAt: Date };
 
     await updatePost(postId, updatedPost);
 
@@ -82,17 +85,51 @@ export default function EditPostForm({ postId, currentPost, currentUser }: EditP
     );
   }
 
+  const handleSubmitForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form data
+    const validationErrors: Record<string, string> = {};
+    if (!formData.title.trim()) validationErrors.title = 'Title is required';
+    if (!formData.content.trim()) validationErrors.content = 'Content is required';
+    
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    
+    if (!postId || !currentUser) return;
+    
+    try {
+      const updatedPost = {
+        ...formData,
+        updatedAt: new Date(),
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName || 'Anonymous',
+        createdAt: currentPost?.createdAt || new Date(),
+      } as Omit<Post, 'id' | 'updatedAt'> & { updatedAt: Date };
+
+      await updatePost(postId, updatedPost);
+      toast.success('Post updated successfully!');
+      router.push(`/posts/${postId}`);
+    } catch (error) {
+      console.error('Error updating post:', error);
+      setErrors({ submit: 'Failed to update post. Please try again.' });
+      toast.error('Failed to update post. Please try again.');
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <PostForm 
         formData={formData}
         setFormData={setFormData}
         errors={errors}
-        onSubmit={handleSubmit}
         isSubmitting={false} 
         isEditing={true}
         currentUser={currentUser} 
         onCancel={() => router.back()}
+        onSubmit={handleSubmitForm}
       />
     </div>
   );

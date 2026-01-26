@@ -1,70 +1,39 @@
-import useSWR, { SWRConfiguration } from 'swr';
+'use server';
 
-// Fetcher for SWR
-const fetcher = async ([url, userId]: [string, string]) => {
-  const res = await fetch(`${url}?userId=${encodeURIComponent(userId)}`);
-  if (!res.ok) throw new Error('Failed to fetch liked posts');
-  const data = await res.json();
-  return data.postIds as string[];
-};
+import { db } from '../firebase/firebase-admin';
+import { Post } from '../types/post';
 
-interface UseLikedPostsOptions extends Omit<SWRConfiguration<string[]>, 'fallbackData'> {
-  initialData?: string[];
-  fallbackData?: string[];
+const LIKES_COLLECTION = 'likes';
+
+export async function getLikedPostIds(userId: string): Promise<string[]> {
+  const snapshot = await db
+    .collection(LIKES_COLLECTION)
+    .where('userId', '==', userId)
+    .get();
+
+  return snapshot.docs.map((doc) => (doc.data() as Post).id as string);
 }
 
-export const useLikedPosts = (userId?: string, options: UseLikedPostsOptions = {}) => {
-  const { initialData, fallbackData, ...swrConfig } = options;
-  
-  const { data, mutate, isLoading, error } = useSWR<string[]>(
-    userId ? ['/api/likes', userId] : null,
-    fetcher,
-    {
-      ...swrConfig,
-      fallbackData: initialData || fallbackData,
-      revalidateOnMount: !initialData,
-    }
-  );
+export async function toggleLike(userId: string, postId: string): Promise<string[]> {
+  const likeQuery = await db
+    .collection(LIKES_COLLECTION)
+    .where('userId', '==', userId)
+    .where('postId', '==', postId)
+    .limit(1)
+    .get();
 
-  const likedPostIds = data || [];
+  if (!likeQuery.empty) {
+    // unlike
+    await likeQuery.docs[0].ref.delete();
+  } else {
+    // like
+    await db.collection(LIKES_COLLECTION).add({
+      userId,
+      postId,
+      createdAt: new Date(),
+    });
+  }
 
-  const toggleLike = async (postId: string) => {
-    if (!userId) return;
-
-    const isLiked = likedPostIds.includes(postId);
-    
-    // 1. Define the optimistic data (what the UI should look like immediately)
-    const optimisticData = isLiked
-      ? likedPostIds.filter(id => id !== postId)
-      : [...likedPostIds, postId];
-
-    // 2. Use mutate to handle the optimistic update
-    await mutate(
-      async () => {
-        const res = await fetch('/api/likes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, postId }),
-        });
-        
-        if (!res.ok) throw new Error('Failed to update likes');
-        
-        // Return the final data (or trigger a revalidation)
-        return optimisticData; 
-      },
-      {
-        optimisticData,
-        rollbackOnError: true,
-        revalidate: true, // Re-sync with server after the call
-      }
-    );
-  };
-
-  return {
-    likedPostIds,
-    isLoading,
-    error,
-    toggleLike,
-    refetchLikes: mutate,
-  };
-};
+  // Return updated list
+  return getLikedPostIds(userId);
+}

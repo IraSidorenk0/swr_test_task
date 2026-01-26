@@ -1,4 +1,3 @@
-import { Timestamp } from "firebase/firestore";
 
 export interface PostBase {
   id: string;
@@ -8,11 +7,12 @@ export interface PostBase {
   likes: number;
   authorId: string;
   authorName: string;
+  likedBy?: string[];
 }
 
 export interface Post extends PostBase {
-  createdAt: Date | Timestamp;
-  updatedAt: Date | Timestamp;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface SerializedPost extends PostBase {
@@ -21,10 +21,12 @@ export interface SerializedPost extends PostBase {
 }
 
 export interface PostFormData {
+  id: string;
   title: string;
   content: string;
   tags: string[];
   likes: number;
+  likedBy?: string[];
 }
 
 export interface AppUser {
@@ -68,6 +70,6 @@ export interface Comment {
   content: string;
   authorId: string;
   authorName: string;
-  createdAt: Timestamp | string;
-  updatedAt: Timestamp | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }

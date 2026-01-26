@@ -1,12 +1,10 @@
 'use server';
 
 import { notFound, redirect } from 'next/navigation';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../../../firebase/firebase';
+import { db } from '../../../../firebase/firebase-admin';
 import { Post, SerializedPost } from '../../../types';
 import { getCurrentUser } from '@/firebase/auth';
 import EditPostClient from './EditPostClient';
-import { getPostById } from '@/firebase-actions/usePosts';
 
 type Props = {
   params: {
@@ -28,18 +26,15 @@ export default async function EditPostPage({ params }: Props) {
     redirect(`/auth?redirect=${encodeURIComponent(`/posts/${postId}/edit`)}`);
   }
 
-  // Fetch post data on the server
-  const postResult = await getPostById(postId);
+  // Fetch post data using firebase-admin
+  const postRef = db.collection('posts').doc(postId);
+  const postDoc = await postRef.get();
   
-  // Handle case where post was not found or there was an error
-  if (!postResult) {
+  // Handle case where post was not found
+  if (!postDoc.exists) {
     notFound();
   }
   
- const postDoc = await getDoc(doc(db, 'posts', postId));
-  if (!postDoc.exists()) {
-    notFound();
-  }
   const postData = postDoc.data() as Post;
   const post = {
     id: postDoc.id,

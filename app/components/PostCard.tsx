@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { Post } from '../types';
-import { Timestamp } from 'firebase/firestore';
-import { AppUser } from '../types';
 import { useRouter } from 'next/navigation';
 
 interface PostFormData {
   title: string;
   content: string;
   tags: string[];
+  likes?: number;
+  likedBy?: string[];
 }
 
 interface PostCardProps {
@@ -23,7 +23,7 @@ interface PostCardProps {
   onSubmitEdit: (post: Post) => void;
   onDelete: (post: Post) => void;
   onEditDataChange: (data: Partial<PostFormData>) => void;
-  formatDate: (timestamp: Timestamp) => string;
+  formatDate: (date: Date) => string;
   isLiked: boolean;
   isOwnPost: boolean;
 }
@@ -98,7 +98,9 @@ export default function PostCard({
             <div className="flex items-center text-sm text-gray-500 mb-2">
               <span>By {post.authorName}</span>
               <span className="mx-2">•</span>
-              <span>{formatDate(post.createdAt as Timestamp)}</span>
+              <time dateTime={typeof post.createdAt === 'string' ? post.createdAt : post.createdAt.toISOString()}>
+                {formatDate(typeof post.createdAt === 'string' ? new Date(post.createdAt) : post.createdAt)}
+              </time>
             </div>
             
             {post.tags && post.tags.length > 0 && (

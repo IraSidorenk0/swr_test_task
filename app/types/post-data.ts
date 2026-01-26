@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase-admin/firestore";
-
 export interface PostData {
   title: string;
   content: string;
@@ -7,7 +5,7 @@ export interface PostData {
   authorId: string;
   authorName: string;
   likes: number;
-  createdAt: Timestamp; 
-  updatedAt: Timestamp; 
+  createdAt: Date; 
+  updatedAt: Date; 
   createdAtFallback: string;
 }

@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Timestamp } from 'firebase/firestore';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import useSWR from 'swr';
 import ConfirmDialog from './ConfirmDialog';
 import { AppUser, Post, PostFormData } from '../types';
 import PostForm from './PostForm';
 import PostCard from './PostCard';
 import { PostFilters } from './PostFilters';
 import { usePosts } from '../../firebase-actions/usePosts';
-import { useLikedPosts } from '../../firebase-actions/useLikedPosts';
+import { getLikedPostIds, toggleLike } from '../../firebase-actions/useLikedPosts';
 
 export default function PostList({ currentUser, initialPosts }: { 
   currentUser: AppUser | null,
@@ -20,71 +20,131 @@ export default function PostList({ currentUser, initialPosts }: {
 
   // Use the usePosts hook for posts CRUD
   const { 
-    posts = [],
+    posts, 
+    isLoading: isLoadingPosts,
+    error: postsError,
     createPost,
     updatePost,
     deletePost,
+    mutate: mutatePosts
   } = usePosts({ 
-    filters: {
-      author: authorFilter, 
-      tag: tagFilter,
-    },
-    initialData: initialPosts
+    author: authorFilter, 
+    tag: tagFilter
   });
 
-  // Use the useLikedPosts hook for tracking liked posts and toggling like state
-  const { likedPostIds, toggleLike: toggleLikeLocal } = useLikedPosts(currentUser?.uid, {
-    // You can pass initialData here if you have server-side liked posts
-    // initialData: serverSideLikedPostIds
-  });
+  // Use SWR to fetch and manage liked posts
+  const { 
+    data: likedPostIds = [], 
+    mutate: mutateLikes,
+    isLoading: isLoadingLikes,
+    error: likesError
+  } = useSWR(
+    currentUser?.uid ? `liked-posts-${currentUser.uid}` : null,
+    () => getLikedPostIds(currentUser!.uid),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      shouldRetryOnError: true,
+      errorRetryCount: 2
+    }
+  );
+
+  // Handle errors
+  useEffect(() => {
+    if (postsError) {
+      console.error('Error loading posts:', postsError);
+      // You might want to show a toast notification here
+    }
+    if (likesError) {
+      console.error('Error loading likes:', likesError);
+      // You might want to show a toast notification here
+    }
+  }, [postsError, likesError]);
+
+  // Handle toggling like state with optimistic updates
+  const toggleLikeLocal = useCallback(async (post: Post) => {
+    if (!currentUser?.uid) return;
+
+    try {
+      // Optimistic update
+      const newLikedPostIds = likedPostIds.includes(post.id)
+        ? likedPostIds.filter(id => id !== post.id)
+        : [...likedPostIds, post.id];
+      
+      // Update the local state immediately
+      await mutateLikes(newLikedPostIds, false);
+      
+      // Make the API call
+      try {
+        await toggleLike(post.id, currentUser.uid);
+        // No need to manually call mutateLikes() as SWR will revalidate
+      } catch (error) {
+        console.error('Error toggling like:', error);
+        // Revert optimistic update
+        mutateLikes();
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      // Revert optimistic update
+      mutateLikes();
+    }
+  }, [currentUser, likedPostIds, mutateLikes]);
 
   const [showPostForm, setShowPostForm] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [formData, setFormData] = useState<PostFormData>({
+    id: '',
     title: '',
     content: '',
     tags: [],
     likes: 0
   });
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Omit<Post, 'id' | 'authorId' | 'authorName' | 'createdAt' | 'updatedAt'>>({ 
-    title: '', 
-    content: '', 
-    tags: [], 
-    likes: 0 
+  const [editData, setEditData] = useState<Omit<Post, 'id' | 'authorId' | 'authorName' | 'createdAt' | 'updatedAt'>>({
+    title: '',
+    content: '',
+    tags: [],
+    likes: 0
   });
   const [editErrors, setEditErrors] = useState<Record<string, string | undefined>>({});
   const [isEditing, setIsEditing] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [appliedAuthorFilter, setAppliedAuthorFilter] = useState<string>('');
   const [appliedTagFilter, setAppliedTagFilter] = useState<string>('');
 
-  // Authentication states
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
+  // Filter posts based on author and tag
   const filteredPosts = useMemo(() => {
-    const authorTerm = appliedAuthorFilter.trim().toLowerCase();
-    const tagTerm = appliedTagFilter.trim().toLowerCase();
-
-    if (!authorTerm && !tagTerm) {
-      return posts;
-    }
-
-    return posts.filter((post) => {
-      const matchesAuthor = authorTerm
-        ? (post.authorName || '').toLowerCase().startsWith(authorTerm)
-        : true;
-
-      const matchesTag = tagTerm
-        ? (post.tags || []).some((t) => (t || '').toLowerCase().startsWith(tagTerm))
-        : true;
-
+    if (!posts) return [];
+    return posts.filter(post => {
+      const matchesAuthor = !authorFilter || post.authorId === authorFilter;
+      const matchesTag = !tagFilter || (post.tags && post.tags.includes(tagFilter));
       return matchesAuthor && matchesTag;
     });
-  }, [posts, appliedAuthorFilter, appliedTagFilter]);
+  }, [posts, authorFilter, tagFilter]);
+
+  // Handle loading and error states
+  if (isLoadingPosts) {
+    return <div className="p-4 text-center">Loading posts...</div>;
+  }
+
+  if (postsError) {
+    return (
+      <div className="p-4 text-center text-red-500">
+        Error loading posts. Please try again later.
+      </div>
+    );
+  }
 
   const handlePostCreated = () => {
     setShowPostForm(false);
+    setFormData({
+      id: '',
+      title: '',
+      content: '',
+      tags: [],
+      likes: 0
+    });
   };
 
   const cancelEditPost = () => {
@@ -94,77 +154,72 @@ export default function PostList({ currentUser, initialPosts }: {
     setEditData({ title: '', content: '', tags: [], likes: 0 });
   };
 
-  const handleSubmitEdit = async (post: Post) => {
-    if (!editingPostId) return;
+  // Handle creating a new post
+  const handleCreatePost = useCallback(async (postData: PostFormData) => {
+    if (!currentUser) return;
     
     try {
-      await updatePost(editingPostId, {
-        title: editData.title,
-        content: editData.content,
-        tags: editData.tags
+      await createPost({
+        title: postData.title,
+        content: postData.content,
+        tags: postData.tags || [],
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Anonymous',
+        likes: 0,
+        likedBy: []
       });
       
+      // Reset form
+      setFormData({
+        id: '',
+        title: '',
+        content: '',
+        tags: [],
+        likes: 0
+      });
+      
+      // Close the form
       setShowPostForm(false);
+    } catch (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+  }, [createPost, currentUser]);
+
+  // Handle updating a post
+  const handleUpdatePost = useCallback(async (postId: string, updates: Partial<Post>) => {
+    try {
+      await updatePost(postId, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
       setEditingPostId(null);
       setIsEditing(false);
-      setEditData({ title: '', content: '', tags: [], likes: 0 });
-      
     } catch (error) {
       console.error('Error updating post:', error);
+      throw error;
     }
-  };
+  }, [updatePost]);
 
-  const handleDeletePost = (post: Post) => {
-    if (!currentUser) return;
-    if (post.authorId !== currentUser.uid) return;
-    setPostToDelete(post);
-    setConfirmOpen(true);
-  };
+  const handleLike = useCallback((post: Post) => {
+    if (!currentUser?.uid) {
+      setShowAuthModal(true);
+      return;
+    }
+    toggleLikeLocal(post);
+  }, [currentUser, toggleLikeLocal]);
 
-  const confirmDelete = async () => {
-    if (!postToDelete) return;
+  const formatDate = (date: string | Date | null | undefined): string => {
+    if (!date) return 'Unknown date';
     
     try {
-      await deletePost(postToDelete.id);
-      setConfirmOpen(false);
-      setPostToDelete(null);
-    } catch (error) {
-      console.error('Error deleting post:', error);
-    }
-  };
-
-  const handleLike = async (postId: string) => {
-    if (!currentUser) return;
-
-    try {
-      // Delegate to useLikedPosts, which handles optimistic update and server call
-      await toggleLikeLocal(postId);
-    } catch (error) {
-      console.error('Error toggling like:', error);
-    }
-  };
-
-  const formatDate = (timestamp: Timestamp | string | Date | null | undefined) => {
-    if (!timestamp) return 'Дата неизвестна';
-    
-    try {
-      let date: Date;
+      const parsedDate = typeof date === 'string' ? new Date(date) : date;
       
-      // Handle Firebase Timestamp
-      if (timestamp instanceof Timestamp) {
-        date = timestamp.toDate();
-      } 
-      // Handle string or Date
-      else {
-        date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      }
-      
-      // If we still don't have a valid date, return unknown
-      if (isNaN(date.getTime())) {
+      if (isNaN(parsedDate.getTime())) {
         return 'Date unknown';
       }
       
-      return date.toLocaleDateString('en-US', {
+      return parsedDate.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -177,10 +232,25 @@ export default function PostList({ currentUser, initialPosts }: {
     }
   };
 
-  const cancelDelete = (): void => {
+  const cancelDelete = useCallback((): void => {
     setConfirmOpen(false);
     setPostToDelete(null);
-  };
+  }, []);
+
+  const confirmDelete = useCallback(async (): Promise<void> => {
+    if (!postToDelete) return;
+    
+    try {
+      await deletePost(postToDelete.id);
+      // The usePosts hook should handle updating the posts list
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      // You might want to show an error message to the user here
+    } finally {
+      setConfirmOpen(false);
+      setPostToDelete(null);
+    }
+  }, [postToDelete, deletePost]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -227,11 +297,14 @@ export default function PostList({ currentUser, initialPosts }: {
                   content: formData.content,
                   tags: formData.tags,
                   authorId: currentUser.uid,
-                  authorName: currentUser.displayName || currentUser.email || 'Anonymous'
+                  authorName: currentUser.displayName || currentUser.email || 'Anonymous',
+                  likes: 0,
+                  likedBy: []
                 });
                 
                 // Reset form
                 setFormData({
+                  id: '',
                   title: '',
                   content: '',
                   tags: [],
@@ -263,10 +336,13 @@ export default function PostList({ currentUser, initialPosts }: {
                 editData={editData}
                 editErrors={editErrors}
                 isEditing={editingPostId === post.id}
-                onToggleLike={(post) => handleLike(post.id)}
+                onToggleLike={handleLike}
                 onCancelEdit={cancelEditPost}
-                onSubmitEdit={handleSubmitEdit}
-                onDelete={handleDeletePost}
+                onSubmitEdit={(post) => handleUpdatePost(post.id, editData)}
+                onDelete={(post) => {
+                  setPostToDelete(post);
+                  setConfirmOpen(true);
+                }}
                 onEditDataChange={(data) => setEditData(prev => ({ ...prev, ...data }))}
                 formatDate={formatDate}
                 isLiked={likedPostIds.includes(post.id)}

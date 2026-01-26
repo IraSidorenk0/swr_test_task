@@ -1,146 +1,73 @@
+// Server-side functions
+export * from './server-actions/posts';
+
+// Client-side hooks
 'use client';
 
-import useSWR, { mutate } from 'swr';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { useCallback } from 'react';
+import useSWR from 'swr';
 import type { Post } from '../app/types';
+import { 
+  fetchPosts as serverFetchPosts,
+  fetchPostById as serverFetchPostById,
+  createPostHandler as serverCreatePost,
+  updateExistingPost as serverUpdatePost,
+  removePost as serverDeletePost
+} from './server-actions/posts';
 
-const POSTS_KEY = 'posts';
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error('Failed to fetch posts');
-  }
-  return res.json();
-};
-
-// Fetcher function for SWR that uses the Next.js API route
-export const fetchPosts = async (filters?: { author?: string; tag?: string }): Promise<Post[]> => {
-  const params = new URLSearchParams();
-
-  if (filters?.author?.trim()) {
-    params.set('author', filters.author.trim());
-  }
-  if (filters?.tag?.trim()) {
-    params.set('tag', filters.tag.trim());
-  }
-
-  const queryString = params.toString();
-  const url = queryString ? `/api/posts?${queryString}` : '/api/posts';
-
-  const data = await fetcher(url);
-
-  const posts = (data.posts || []) as Post[];
-  return posts;
-};
-
-interface UsePostsOptions {
-  filters?: {
-    author?: string;
-    tag?: string;
-  };
-  initialData?: Post[];
-  fallbackData?: Post[];
-}
-
-export const usePosts = (options: UsePostsOptions = {}) => {
-  const { filters, initialData, fallbackData } = options;
-  
-  const { data: posts, error, isLoading, mutate: mutatePosts } = useSWR<Post[]>(
-    [POSTS_KEY, filters],
-    () => fetchPosts(filters),
-    {
-      fallbackData: initialData || fallbackData,
-      revalidateOnMount: !initialData, // Don't revalidate on mount if we have initialData
-    }
+export function usePosts(filters?: { author?: string; tag?: string }) {
+  const { data, error, isLoading, mutate } = useSWR(
+    ['posts', filters],
+    () => serverFetchPosts(filters).then(res => res.data)
   );
 
-  const createPost = async (postData: Pick<Post, 'title' | 'content' | 'tags' | 'authorId' | 'authorName'>) => {
-    try {
-      const newPost = {
-        ...postData,
-        likes: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+  const createPost = useCallback(async (postData: Parameters<typeof serverCreatePost>[0]) => {
+    const { data: postId, error } = await serverCreatePost(postData);
+    if (error) throw new Error(error);
+    await mutate();
+    return postId;
+  }, [mutate]);
 
-      const docRef = await addDoc(collection(db, 'posts'), newPost);
-      
-      // Optimistic update
-      const optimisticPost: Post = {
-        ...newPost,
-        id: docRef.id,
-        likes: 0,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      
-      mutatePosts([optimisticPost, ...(posts || [])], false);
-      
-      // Revalidate
-      mutatePosts();
-      
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating post:', error);
-      throw error;
-    }
-  };
+  const updatePost = useCallback(async (postId: string, updates: Parameters<typeof serverUpdatePost>[1]) => {
+    const { error } = await serverUpdatePost(postId, updates);
+    if (error) throw new Error(error);
+    await mutate();
+  }, [mutate]);
 
-  const updatePost = async (postId: string, updates: Partial<Post>) => {
-    try {
-      const postRef = doc(db, 'posts', postId);
-      await updateDoc(postRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
-      
-      // Revalidate the posts list
-      mutatePosts();
-    } catch (error) {
-      console.error('Error updating post:', error);
-      throw error;
-    }
-  };
-
-  const deletePost = async (postId: string) => {
-    try {
-      // Optimistic update
-      const previousPosts = posts || [];
-      const updatedPosts = previousPosts.filter(post => post.id !== postId);
-      mutatePosts(updatedPosts, false);
-      
-      await deleteDoc(doc(db, 'posts', postId));
-      
-      // Revalidate
-      mutatePosts();
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      mutatePosts(); // Re-fetch on error
-      throw error;
-    }
-  };
+  const deletePost = useCallback(async (postId: string) => {
+    const { error } = await serverDeletePost(postId);
+    if (error) throw new Error(error);
+    await mutate();
+  }, [mutate]);
 
   return {
-    posts: posts || [],
+    posts: data || [],
     isLoading,
     error,
     createPost,
     updatePost,
     deletePost,
-    mutate: mutatePosts,
+    mutate
   };
-};
+}
 
-export const mutatePosts = () => {
-  return mutate(POSTS_KEY);
-};
-
-export const getPostById = async (postId: string) => {
- const { data, mutate, isLoading, error } = useSWR(
-    postId ? ['/api/posts', postId] : null,
-    fetcher
+export function usePost(postId: string) {
+  const { data, error, isLoading, mutate } = useSWR(
+    ['post', postId],
+    () => serverFetchPostById(postId).then((res: { data: Post | null; error: string | null }) => res.data)
   );
-  return data;
-};
+
+  const updatePost = useCallback(async (updates: Parameters<typeof serverUpdatePost>[1]) => {
+    const { error } = await serverUpdatePost(postId, updates);
+    if (error) throw new Error(error);
+    await mutate();
+  }, [postId, mutate]);
+
+  return {
+    post: data,
+    isLoading,
+    error,
+    updatePost,
+    mutate
+  };
+}

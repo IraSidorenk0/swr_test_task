@@ -2,7 +2,6 @@
 import PostList from './components/PostList';
 import { getCurrentUser } from '../firebase/auth';
 import { adminDb } from '../firebase/firebase-admin';
-import { Timestamp } from 'firebase/firestore';
 import type { Post } from './types';
 
 export default async function Home() {
@@ -14,7 +13,7 @@ export default async function Home() {
   let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = adminDb.collection('posts');
   
   if (authorFilter) {
-    query = query.where('authorId', '==', authorFilter);
+    query = query.where('authorId', 'array-contains', authorFilter);
   }
   
   if (tagFilter) {
@@ -35,7 +34,6 @@ export default async function Home() {
       likes: typeof data.likes === 'number' ? data.likes : 0,
       authorId: data.authorId || '',
       authorName: data.authorName || 'Anonymous',
-      // Convert Firestore Timestamp to Date if needed
       createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt || new Date(),
       updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt || new Date(),
     };
